@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
             fprintf(file_ptr, " %-9lld", (long long) stat_buf.st_size);
             char cwd[4096];                                                                                             // path
             if (getcwd(cwd, sizeof(cwd)) != NULL)
-                fprintf(file_ptr, " %s/%s/%s\n", cwd, argv[1], direntp->d_name);
+                fprintf(file_ptr, " %s/%s %s\n", cwd, argv[1], direntp->d_name);
             else
                 perror("getcwd() error");
         }

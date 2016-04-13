@@ -33,16 +33,25 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    FILE* file_ptr;                                                                                                     // header of the file
+    file_ptr = fopen("files.txt", "w");
+    if (file_ptr == NULL) {
+        perror("Error opening files.txt.\n");
+        exit(EXIT_FAILURE);
+    }
+    fclose(file_ptr);
     pid = fork();
     if (pid == 0)
         execlp("./lsdir", "./lsdir", argv[1], NULL);
     else wait(&status);
+    pid = fork();
+    if (pid == 0)
+        execlp("sort", "sort", "files.txt", "-k", "11,11", "-k", "8,8", "-o", "files_sorted.txt", NULL);
+    else wait(&status);
 
-    FILE* file_ptr;                                                                                                     // header of the file
-    file_ptr = fopen("files.txt", "r");
-
+    file_ptr = fopen("files_sorted.txt", "r");
     if (file_ptr == NULL) {
-        perror("Error opening files.txt.\n");
+        perror("Error opening files_sorted.txt.\n");
         exit(EXIT_FAILURE);
     }
 
@@ -52,6 +61,7 @@ int main(int argc, char *argv[]) {
     rewind(file_ptr);
 
     int i = 0;
+    int j;
     ssize_t real_lentgh;
     while ((real_lentgh = getline(&line, &line_length, file_ptr)) != -1) {
         line[real_lentgh - 1] = '\0';
@@ -75,13 +85,21 @@ int main(int argc, char *argv[]) {
         fileInfo.path = malloc((int)(real_lentgh - 66) * sizeof(char));
         memcpy(fileInfo.path, &line[65], real_lentgh - 66);
         fileInfo.path[real_lentgh - 66] = '\0';
+        j = (int)(real_lentgh - 67);
+        while(fileInfo.path[j]) {
+            if (fileInfo.path[j] == ' ') {
+                fileInfo.path[j] = '/';
+                break;
+            }
+            j--;
+        }
         printf("|%s|\n", fileInfo.path);
         fileInfo.name = basename(fileInfo.path);
         printf("|%s|\n", fileInfo.name);
         fileInfos[i] = fileInfo;
         i++;
     }
-    
+
     fclose(file_ptr);
     exit(0);
 }
