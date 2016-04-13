@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/wait.h>
 
 #define MAX_LENGTH 512
 
@@ -43,7 +44,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "in %s\n\n", name);
         }
         if (S_ISREG(stat_buf.st_mode)) {                                                                                // if regular file save file info
-            fprintf(file_ptr, "%-7ld ", (long) stat_buf.st_ino);                                                        // inode
+            fprintf(file_ptr, "%-8ld ", (long) stat_buf.st_ino);                                                        // inode
             fprintf(file_ptr, (stat_buf.st_mode & S_IRUSR) ? "r" : "-");                                                // permissions
             fprintf(file_ptr, (stat_buf.st_mode & S_IWUSR) ? "w" : "-");
             fprintf(file_ptr, (stat_buf.st_mode & S_IXUSR) ? "x" : "-");

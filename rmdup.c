@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
+#include <sys/wait.h>
 
 #define MAX_LENGTH 512
 
@@ -48,11 +49,11 @@ int getNumberFiles(FILE* file_ptr) {
 
 int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                                                          // need to add error checking
 
-    char* line;
     char inode_str[9];
     char time_str[11];
     char size_str[10];
-    size_t line_length;
+    char* line = NULL;
+    size_t line_length = 0;
     ssize_t real_lentgh;
     int file_index = 0;
     int path_index;
@@ -69,7 +70,7 @@ int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                  
         time_str[10] = '\0';
         fileInfo.mtime = (time_t)(atoll(time_str));
         memcpy(size_str, &line[55], 9);
-        size_str[9] = '\0';
+v        size_str[9] = '\0';
         fileInfo.size = atoi(size_str);
         fileInfo.path = malloc((int)(real_lentgh - 66) * sizeof(char));
         memcpy(fileInfo.path, &line[65], real_lentgh - 66);
@@ -94,6 +95,7 @@ int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                  
         printf("|%s|\n", fileInfo.name);
     }
 
+    free(line);
     fclose(file_ptr);
     return 0;
 
@@ -119,12 +121,16 @@ int main(int argc, char *argv[]) {
 
     struct FileInfo currentFile = fileInfos[0];
     struct FileInfo otherFile;
-    for (int i = 1; i < numberFiles; i++) {
+    int i;
+    for (i = 1; i < numberFiles; i++) {
         otherFile = fileInfos[i];
-        if (strcmp(otherFile.name, currentFile.name) != 0) {
+        if (strcmp(otherFile.name, currentFile.name) != 0) {                                                            // different file names move current file to next file
             currentFile = fileInfos[i];
             continue;
         }
+        if (strcmp(otherFile.permissions, currentFile.permissions) != 0)                                                // same file name different permissions, advance, but keep current file
+            continue;
+
     }
 
     exit(0);
