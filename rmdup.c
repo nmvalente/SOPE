@@ -70,7 +70,7 @@ int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                  
         time_str[10] = '\0';
         fileInfo.mtime = (time_t)(atoll(time_str));
         memcpy(size_str, &line[55], 9);
-v        size_str[9] = '\0';
+        size_str[9] = '\0';
         fileInfo.size = atoi(size_str);
         fileInfo.path = malloc((int)(real_lentgh - 66) * sizeof(char));
         memcpy(fileInfo.path, &line[65], real_lentgh - 66);
@@ -118,21 +118,25 @@ int main(int argc, char *argv[]) {
     int numberFiles = getNumberFiles(file_ptr);                                                                         // determine number of files
     struct FileInfo* fileInfos = malloc(numberFiles * sizeof(struct FileInfo));
     if (getFileInfos(fileInfos, file_ptr)) exit(EXIT_FAILURE);                                                          // parse sorted file informations into array of structs
-
+/*
     struct FileInfo currentFile = fileInfos[0];
     struct FileInfo otherFile;
-    int i;
-    for (i = 1; i < numberFiles; i++) {
-        otherFile = fileInfos[i];
-        if (strcmp(otherFile.name, currentFile.name) != 0) {                                                            // different file names move current file to next file
-            currentFile = fileInfos[i];
+    int i = 0;
+    int j = 1;
+    while (i < numberFiles - 1) {
+        otherFile = fileInfos[j];
+        if (strcmp(otherFile.name, currentFile.name) != 0) {                                                            // different file names move current file to next
+            i++;
+            j = i + 1;
+            currentFile = fileInfos[j];
             continue;
         }
-        if (strcmp(otherFile.permissions, currentFile.permissions) != 0)                                                // same file name different permissions, advance, but keep current file
+        if (strcmp(otherFile.permissions, currentFile.permissions) != 0 || otherFile.size != currentFile.size) {        // same file name different permissions or sizes, advance, but keep current file
+            j++;
             continue;
-
+        }
     }
-
+    */
     exit(0);
 }
 
