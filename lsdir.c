@@ -28,11 +28,9 @@ void saveFileInfo(char *dir_name, char *file_name, struct stat *stat_buf, FILE *
     fprintf(file_ptr, " %s", dtime);
     fprintf(file_ptr, " %-10lld", (long long)((*stat_buf).st_mtime));
     fprintf(file_ptr, " %-9lld", (long long) (*stat_buf).st_size);
-    char cwd[MAX_PATH_LENGTH];                                                                                          // path and name
-    if (getcwd(cwd, sizeof(cwd)) != NULL)
-        fprintf(file_ptr, " %s/%s %s\n", cwd, dir_name, file_name);
-    else
-        perror("getcwd() error");
+    char dir_path[MAX_PATH_LENGTH];
+    realpath(dir_name, dir_path);
+    fprintf(file_ptr, " %s/%s \n", dir_path, file_name);
 }
 
 int main(int argc, char *argv[]) {

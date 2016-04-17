@@ -1,4 +1,0 @@
-552391  cx1.sh                  rw-rw-r-- 156    Wed Mar  2 18:49:11 2016
-/home/nuno/Área de Trabalho/proj
-553234  Hello_World             rw-rw-r-- 69     Tue Feb 23 10:37:40 2016
-/home/nuno/Área de Trabalho/proj

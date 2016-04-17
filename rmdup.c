@@ -11,6 +11,7 @@
 #define SIZE_LENGTH 10
 #define BEFORE_PATH_LENGTH 65
 #define BEFORE_TIME_LENGTH 44
+#define MAX_PATH_LENGTH 4096
 
 #define LOG 1
 
@@ -174,14 +175,18 @@ int compareFiles(struct FileInfo *file1, struct FileInfo *file2) {
     return compareFileContents(file1, file2);                                                                           // same contents return 0, different contents return 1, error return -1
 }
 
-int createHardLink(struct FileInfo *file1, struct FileInfo *file2) {
+int createHardLink(FILE *file_ptr, struct FileInfo *file1, struct FileInfo *file2) {
     int unlink_res = unlink(file2->path);
     if (unlink_res) {
         perror("Error unlinking file.\n");
         return unlink_res;
     }
     int link_res = link(file1->path, file2->path);
-    if (link_res) perror("Error linking files.\n");
+    if (link_res) {
+        perror("Error linking files.\n");
+        return link_res;
+    }
+    fprintf(file_ptr, " %s <- %s\n", file1->path, file2->path);
     return link_res;
 }
 
@@ -192,15 +197,22 @@ int main(int argc, char *argv[]) {
     }
     if (runlsdir(argv[1]))                                                                                              // run lsdir and sort files.txt
         exit(2);
-    FILE *file_ptr = fopen("files_sorted.txt", "r");
-    if (file_ptr == NULL) {
+    FILE *in_file_ptr = fopen("files_sorted.txt", "r");
+    if (in_file_ptr == NULL) {
         perror("Error opening files_sorted.txt.\n");
         exit(3);
     }
-    int numberFiles = getNumberFiles(file_ptr);                                                                         // determine number of files
+    int numberFiles = getNumberFiles(in_file_ptr);                                                                      // determine number of files
     struct FileInfo **fileInfos = malloc(numberFiles * sizeof(struct FileInfo*));
-    if (getFileInfos(fileInfos, file_ptr))                                                                              // parse sorted file informations into array of structs
+    if (getFileInfos(fileInfos, in_file_ptr))                                                                           // parse sorted file informations into array of structs
         exit(4);
+    char hlinks_path[MAX_PATH_LENGTH];
+    snprintf(hlinks_path, MAX_PATH_LENGTH, "%s%s", argv[1], "/hlinks.txt");
+    FILE *out_file_ptr = fopen(hlinks_path, "w");
+    if (out_file_ptr == NULL) {
+        perror("Error opening hlinks.txt.\n");
+        exit(5);
+    }
     int i = 0;
     int j = 1;
     while (i < numberFiles - 1) {
@@ -217,7 +229,7 @@ int main(int argc, char *argv[]) {
                     j++;
                     break;
                 case 0:                                                                                                 // same contents, create hardlink
-                    createHardLink(fileInfos[i], fileInfos[j]);                                                         // does not stop on hardlink error, continues to next file
+                    createHardLink(out_file_ptr, fileInfos[i], fileInfos[j]);                                           // does not stop on hardlink error, continues to next file
                     j++;
                     break;
                 default:                                                                                                // does not stop on compare error, continues to next file
