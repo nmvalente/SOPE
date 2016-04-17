@@ -27,7 +27,10 @@ int runlsdir(char* directory) {
         return 1;
     }
     fclose(file_ptr);
-    pid = fork();
+    if ((pid = fork()) == -1) {
+        perror("Error creating fork.\n");
+        return -1;
+    }
     if (pid == 0)
         execlp("./lsdir", "./lsdir", directory, NULL);
     else wait(&status);
@@ -39,12 +42,12 @@ int runlsdir(char* directory) {
 }
 
 int getNumberFiles(FILE* file_ptr) {
-    char* line;
-    size_t line_length;
+    char* line = NULL;
+    size_t line_length = 0;
     int numberFiles = 0;
     while (getline(&line, &line_length, file_ptr) != -1) numberFiles++;
     rewind(file_ptr);
-    return  numberFiles;
+    return numberFiles;
 }
 
 int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                                                          // need to add error checking
@@ -101,6 +104,53 @@ int getFileInfos(struct FileInfo* fileInfos, FILE* file_ptr) {                  
 
 }
 
+int compareFileContents(char* path1, char* path2) {
+    printf("Comparing file contents: %s, %s\n", path1, path2);
+    pid_t pid;
+    int status;
+    int link[2];
+    char whatever[4096];
+    if (pipe(link) == -1) {
+        perror("Error opening pipe.\n");
+        return -1;
+    }
+    if ((pid = fork()) == -1) {
+        perror("Error creating fork.\n");
+        return -1;
+    }
+    if (pid == 0) {
+        dup2(link[1], STDOUT_FILENO);
+        close(link[0]);
+        close(link[1]);
+        execlp("diff", "diff", path1, path2, NULL);
+    } else wait(&status);
+
+    close(link[1]);
+    int nbytes = (int) read(link[0], whatever, sizeof(whatever));
+    if (nbytes == 0) {
+        printf("Same file contents.\n");
+        return 0;
+    }
+    printf("Different file contents.\n");
+    return 1;
+}
+
+int compareFiles(struct FileInfo file1, struct FileInfo file2) {
+    if (strcmp(file1.name, file2.name) != 0) {                                                                          // different file names return 2;
+        printf("Different file names: %s, %s.\n", file1.path, file2.path);
+        return 2;
+    }
+    if (strcmp(file1.permissions, file2.permissions) != 0 || file1.size != file2.size) {                                // same file name, but different permissions or sizes, return 1
+        printf("Different permissions or sizes: %s, %s.\n", file1.path, file2.path);
+        return 1;
+    }
+    return compareFileContents(file1.path, file2.path);                                                                 // same contents return 0, different contents return 1, error return -1
+}
+
+int createHardLink(struct FileInfo file1, struct FileInfo file2) {
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
 
     if (argc != 2) {                                                                                                    // number of arguments must be 2
@@ -118,25 +168,34 @@ int main(int argc, char *argv[]) {
     int numberFiles = getNumberFiles(file_ptr);                                                                         // determine number of files
     struct FileInfo* fileInfos = malloc(numberFiles * sizeof(struct FileInfo));
     if (getFileInfos(fileInfos, file_ptr)) exit(EXIT_FAILURE);                                                          // parse sorted file informations into array of structs
-/*
+
     struct FileInfo currentFile = fileInfos[0];
     struct FileInfo otherFile;
     int i = 0;
     int j = 1;
     while (i < numberFiles - 1) {
-        otherFile = fileInfos[j];
-        if (strcmp(otherFile.name, currentFile.name) != 0) {                                                            // different file names move current file to next
-            i++;
-            j = i + 1;
-            currentFile = fileInfos[j];
-            continue;
+        while (j < numberFiles -1) {
+            otherFile = fileInfos[j];
+            int compare = compareFiles(currentFile, otherFile);
+            switch (compare) {
+                case 2:
+                    j = numberFiles - 1;
+                    break;
+                case 1:
+                    j++;
+                    break;
+                case 0:
+                    createHardLink(currentFile, otherFile);
+                    j++;
+                    break;
+                default:
+                    j++;
+                    break;
+            }
         }
-        if (strcmp(otherFile.permissions, currentFile.permissions) != 0 || otherFile.size != currentFile.size) {        // same file name different permissions or sizes, advance, but keep current file
-            j++;
-            continue;
-        }
+        currentFile = fileInfos[++i];
+        j = i + 1;
     }
-    */
     exit(0);
 }
 

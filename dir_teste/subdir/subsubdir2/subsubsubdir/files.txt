@@ -1,0 +1,9 @@
+552391  cx1.sh                  rw-rw-r-- 156    Wed Mar  2 18:49:11 2016
+/home/nuno/Área de Trabalho/proj
+553234  Hello_World             rw-rw-r-- 69     Tue Feb 23 10:37:40 2016
+/home/nuno/Área de Trabalho/proj
+23732907 cx1.sh                  rw-r--r-- 156   /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 2016
+23732908 Hello_World             rw-r--r-- 69    /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 2016
+23732907 cx1.sh                  rw-r--r-- 156   /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 2016
+23732908 Hello_World             rw-r--r-- 69    /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 2016
+23732907 cx1.sh                  rw-r--r-- 156   /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 201623732908 Hello_World             rw-r--r-- 69    /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Tue Apr 12 15:58:13 2016

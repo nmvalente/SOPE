@@ -1,0 +1,4 @@
+23732907 rw-r--r-- Tue Apr 12 15:58:13 2016 156       /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 cx1.sh
+23732908 rw-r--r-- Tue Apr 12 15:58:13 2016 69        /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Hello_World
+23742776 rw-r--r-- Tue Apr 12 15:58:13 2016 69        /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Hello_World_copy_long_filename
+23742836 rw-r--r-- Wed Apr 13 14:41:49 2016 427636099 /Users/Angie/Documents/MIEIC/2A2S/SOPE/practice/project1 Snow.Chick.A.Penguin's.Tale.2015.720p.BluRay.x264-[YTS.AG].mp4

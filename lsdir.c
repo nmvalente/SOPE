@@ -66,7 +66,10 @@ int main(int argc, char *argv[]) {
                 perror("getcwd() error");
         }
         else if (S_ISDIR(stat_buf.st_mode)) {                                                                           // if directory start new lsdir process
-            pid = fork();
+            if ((pid = fork()) == -1) {
+                perror("Error creating fork.\n");
+                exit(EXIT_FAILURE);
+            }
             if (pid == 0)
                 execlp("./lsdir", "./lsdir", name, NULL);
             else wait(&status);
