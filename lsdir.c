@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
                 exit(3);
             }
             if (pid == 0)
-                execlp("./lsdir", "./lsdir", name, NULL);
+                execlp(argv[0], argv[0], name, NULL);
             else wait(&status);
         }
     }

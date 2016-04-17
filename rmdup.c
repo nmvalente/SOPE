@@ -25,7 +25,7 @@ struct FileInfo {
     char *name;
 };
 
-int runlsdir(char *directory) {
+int runlsdir(char *lsdir, char *directory) {
     pid_t pid;
     int status;
     FILE *file_ptr = fopen("files.txt", "w");
@@ -39,7 +39,7 @@ int runlsdir(char *directory) {
         return -1;
     }
     if (pid == 0)
-        execlp("./lsdir", "./lsdir", directory, NULL);
+        execlp(lsdir, lsdir, directory, NULL);
     else wait(&status);
     if ((pid = fork()) == -1) {
         perror("Error creating fork.\n");
@@ -195,7 +195,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s dir_name\n", argv[0]);
         exit(1);
     }
-    if (runlsdir(argv[1]))                                                                                              // run lsdir and sort files.txt
+    int lsdir_length = (int) strlen(argv[0]);
+    char *lsdir = malloc((lsdir_length + 1) * sizeof(char));
+    char *base = argv[0];
+    base[lsdir_length - 5] = '\0';
+    snprintf(lsdir, lsdir_length + 1, "%s%s", base, "lsdir");
+    if (runlsdir(lsdir, argv[1]))                                                                                       // run lsdir and sort files.txt
         exit(2);
     FILE *in_file_ptr = fopen("files_sorted.txt", "r");
     if (in_file_ptr == NULL) {
