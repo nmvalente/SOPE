@@ -245,6 +245,15 @@ int main(int argc, char *argv[]) {
         i++;
         j = i + 1;
     }
+
+    if (unlink("files_sorted.txt")) perror("Error unlinking files_sorted.txt.\n");
+    for (i = 0; i < numberFiles; i++) {
+        free(fileInfos[i]->name);
+        free(fileInfos[i]->path);
+        free(fileInfos[i]);
+    }
+    free(fileInfos);
+    free(lsdir);
     exit(0);
 }
 

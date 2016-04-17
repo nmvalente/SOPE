@@ -30,7 +30,7 @@ void saveFileInfo(char *dir_name, char *file_name, struct stat *stat_buf, FILE *
     fprintf(file_ptr, " %-9lld", (long long) (*stat_buf).st_size);
     char dir_path[MAX_PATH_LENGTH];
     realpath(dir_name, dir_path);
-    fprintf(file_ptr, " %s/%s \n", dir_path, file_name);
+    fprintf(file_ptr, " %s %s\n", dir_path, file_name);
 }
 
 int main(int argc, char *argv[]) {
@@ -76,3 +76,4 @@ int main(int argc, char *argv[]) {
     closedir(dirp);
     exit(0);
 }
+
