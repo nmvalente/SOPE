@@ -103,7 +103,7 @@ int getFileInfos(struct FileInfo **fileInfos, FILE *file_ptr) {
         }
         name = basename(fileInfo->path);
         name_length = (int) strlen(name);
-        fileInfo->name = malloc(name_length * sizeof(char));
+        fileInfo->name = malloc((name_length + 1) * sizeof(char));
         memcpy(fileInfo->name, &name[0], name_length);
         fileInfo->name[name_length] = '\0';
         fileInfos[file_index] = fileInfo;
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
         i++;
         j = i + 1;
     }
-
+    fclose(out_file_ptr);
     if (unlink("files_sorted.txt")) perror("Error unlinking files_sorted.txt.\n");
     for (i = 0; i < numberFiles; i++) {
         free(fileInfos[i]->name);
