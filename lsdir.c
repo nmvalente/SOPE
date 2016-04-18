@@ -12,7 +12,7 @@
 #define MAX_NAME_LENGTH 512
 #define DATE_LENGTH 24
 
-void saveFileInfo(char *dir_name, char *file_name, struct stat *stat_buf, FILE *file_ptr) {
+void saveFileInfo(char *dir_path, char *file_name, struct stat *stat_buf, FILE *file_ptr) {
     fprintf(file_ptr, "%-8ld ", (long) (*stat_buf).st_ino);                                                             // inode
     fprintf(file_ptr, ((*stat_buf).st_mode & S_IRUSR) ? "r" : "-");                                                     // permissions
     fprintf(file_ptr, ((*stat_buf).st_mode & S_IWUSR) ? "w" : "-");
@@ -28,8 +28,6 @@ void saveFileInfo(char *dir_name, char *file_name, struct stat *stat_buf, FILE *
     fprintf(file_ptr, " %s", dtime);
     fprintf(file_ptr, " %-10lld", (long long)((*stat_buf).st_mtime));
     fprintf(file_ptr, " %-9lld", (long long) (*stat_buf).st_size);
-    char dir_path[MAX_PATH_LENGTH];
-    realpath(dir_name, dir_path);
     fprintf(file_ptr, " %s %s\n", dir_path, file_name);
 }
 
@@ -48,6 +46,8 @@ int main(int argc, char *argv[]) {
         perror(argv[1]);
         exit(2);
     }
+    char dir_path[MAX_PATH_LENGTH];
+    realpath(argv[1], dir_path);
     FILE *file_ptr = fopen("files.txt", "a");
     while ((direntp = readdir(dirp)) != NULL) {                                                                         // alternative to chdir()
         if (strcmp(direntp->d_name, ".") == 0 || strcmp(direntp->d_name, "..") == 0)
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "in %s\n\n", name);
         }
         if (S_ISREG(stat_buf.st_mode)) {                                                                                // if regular file, save file info
-            saveFileInfo(argv[1], direntp->d_name, &stat_buf, file_ptr);
+            saveFileInfo(dir_path, direntp->d_name, &stat_buf, file_ptr);
         }
         else if (S_ISDIR(stat_buf.st_mode)) {                                                                           // if directory start new lsdir process
             if ((pid = fork()) == -1) {

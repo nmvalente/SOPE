@@ -259,6 +259,11 @@ int main(int argc, char *argv[]) {
     }
     fclose(out_file_ptr);
     if (unlink("files_sorted.txt")) perror("Error unlinking files_sorted.txt.\n");
+    char files_path[MAX_PATH_LENGTH];
+    char dir_path[MAX_PATH_LENGTH];
+    realpath(argv[1], dir_path);
+    snprintf(files_path, MAX_PATH_LENGTH, "%s%s", dir_path, "/files.txt");
+    if (rename("files.txt", files_path)) perror("Error moving files.txt to directory.\n");
     for (i = 0; i < numberFiles; i++) {
         free(fileInfos[i]->name);
         free(fileInfos[i]->path);
