@@ -14,6 +14,8 @@
 #define BEFORE_TIME_LENGTH 44
 #define MAX_PATH_LENGTH 4096
 
+#define SPACES_IN_NAMES 0
+
 #define LOG 1
 
 struct FileInfo {
@@ -42,12 +44,17 @@ int runlsdir(char *lsdir, char *directory) {
     if (pid == 0)
         execlp(lsdir, lsdir, directory, NULL);
     else wait(&status);
+    if (SPACES_IN_NAMES) {
+        system("awk '{print$NF,$8,$0}' files.txt | sort -k1,1 | cut -f3- -d' ' > files_sorted.txt");
+        return 0;
+    }
     if ((pid = fork()) == -1) {
         perror("Error creating fork.\n");
         return -1;
     }
-    if (pid == 0)
+    if (pid == 0) {
         execlp("sort", "sort", "files.txt", "-k", "11,11", "-k", "8,8", "-o", "files_sorted.txt", NULL);
+    }
     else wait(&status);
     return 0;
 }

@@ -1,0 +1,7 @@
+Notas:
+1. makefile cria o diretório bin, por isso não há problema se este não existir.
+2. rmdup e lsdir têm que estar no mesmo diretório quando rmdup é invocado.
+3. rmdup e lsdir aceitam caminhos absolutos ou relativos para o diretório a percorrer.
+4. rmdup e lsdir podem ser invocados de qualquer diretório, desde que se indique o caminho até ao seu diretório.
+5. Quando existem espaços no caminho ou no nome de um ou mais ficheiros, o sort invocado em rmdup da forma "execlp("sort", "sort", "files.txt", "-k", "11,11", "-k", "8,8", "-o", "files_sorted.txt", NULL);" não ordena files.txt da forma correta. Consequentemente a remoção de duplicados não funciona como esperado. A solução é usar um comando awk antes de sort e cut no final, ou seja, usar o comando "awk '{print$NF,$8,$0}' files.txt | sort -k1,1 | cut -f3- -d' ' > files_sorted.txt". Apenas conseguimos invocar este comando recorrendo a system ou execlp("sh","sh","-c", ...). Como isso é proibido, colocamos uma constante SPACES_IN_NAMES em rmdup que estando a 0 chama o comando sort inicial, com a desvantagem de não funcionar se houver espaços.
+6. Para desativar o output para a consola de rmdup, basta colocar a constante LOG igual a 0.
