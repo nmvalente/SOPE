@@ -4,6 +4,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 #define PERMISSIONS_LENGTH 10
 #define INODE_LENGTH 9
@@ -195,28 +196,32 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s dir_name\n", argv[0]);
         exit(1);
     }
+    if (opendir(argv[1]) == NULL) {                                                                                     // second argument must be a valid directory path
+        perror(argv[1]);
+        exit(2);
+    }
     int lsdir_length = (int) strlen(argv[0]);
     char *lsdir = malloc((lsdir_length + 1) * sizeof(char));
     char *base = argv[0];
     base[lsdir_length - 5] = '\0';
     snprintf(lsdir, lsdir_length + 1, "%s%s", base, "lsdir");
     if (runlsdir(lsdir, argv[1]))                                                                                       // run lsdir and sort files.txt
-        exit(2);
+        exit(3);
     FILE *in_file_ptr = fopen("files_sorted.txt", "r");
     if (in_file_ptr == NULL) {
         perror("Error opening files_sorted.txt.\n");
-        exit(3);
+        exit(4);
     }
     int numberFiles = getNumberFiles(in_file_ptr);                                                                      // determine number of files
     struct FileInfo **fileInfos = malloc(numberFiles * sizeof(struct FileInfo*));
     if (getFileInfos(fileInfos, in_file_ptr))                                                                           // parse sorted file informations into array of structs
-        exit(4);
+        exit(5);
     char hlinks_path[MAX_PATH_LENGTH];
     snprintf(hlinks_path, MAX_PATH_LENGTH, "%s%s", argv[1], "/hlinks.txt");
     FILE *out_file_ptr = fopen(hlinks_path, "w");
     if (out_file_ptr == NULL) {
         perror("Error opening hlinks.txt.\n");
-        exit(5);
+        exit(6);
     }
     int i = 0;
     int j = 1;
