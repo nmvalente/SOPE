@@ -152,7 +152,8 @@ int compareFileContents(struct FileInfo *file1, struct FileInfo *file2) {
         close(link[0]);
         close(link[1]);
         execlp("diff", "diff", file1->path, file2->path, NULL);
-    } else wait(&status);
+    } 
+	// else wait(&status);																								// do not wait, waiting removes paralelism
     close(link[1]);
     int nbytes = (int) read(link[0], whatever, sizeof(whatever));
     if (nbytes == 0) {

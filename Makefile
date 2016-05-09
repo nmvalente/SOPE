@@ -1,14 +1,14 @@
 # Makefile for rmdup and lsdir - SOPE
 
-all: createdir lsdir rmdup
+all: createdir bin/lsdir bin/rmdup
 
 createdir: 
 	mkdir -p bin/
 	
-lsdir: lsdir.c
+bin/lsdir: lsdir.c
 	gcc -Wall -o bin/lsdir lsdir.c
 
-rmdup: rmdup.c
+bin/rmdup: rmdup.c
 	gcc -Wall -o bin/rmdup rmdup.c
 
 trash:

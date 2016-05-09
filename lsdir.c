@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     struct stat stat_buf;
     char name[MAX_NAME_LENGTH];
     pid_t pid;
-    int status;
+//    int status;
     if (argc != 2) {                                                                                                    // number of arguments must be 2
         fprintf(stderr, "Usage: %s dir_name\n", argv[0]);
         exit(1);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
             }
             if (pid == 0)
                 execlp(argv[0], argv[0], name, NULL);
-            else wait(&status);
+//            else wait(&status);																						// do not wait, waiting removes paralelism
         }
     }
     fclose(file_ptr);
