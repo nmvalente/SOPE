@@ -44,3 +44,17 @@ static unsigned long parse_ulong(char *str) {
     /* Successful conversion */
     return val;
 }
+
+typedef enum {N, E, S, O} acesso;
+
+struct Viatura {
+    unsigned short tempo_est;
+    acesso acesso_est;
+};
+
+struct Viatura *createViatura(unsigned short tempo_est, acesso acesso_est) {
+    struct Viatura *viatura = malloc(sizeof(struct Viatura));
+    viatura->tempo_est = tempo_est;
+    viatura->acesso_est = acesso_est;
+    return viatura;
+}
