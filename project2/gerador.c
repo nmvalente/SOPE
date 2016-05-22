@@ -14,6 +14,13 @@
 #define SEC2NANO        1000000000
 #define LOG "gerador.log"
 
+/*
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; variavel global com inicializacao do mutex;
+pthread_mutex_lock(&mutex); bloqueia para iniciar secção critica
+pthread_mutex_unlock(&mutex); desbloqueia para encerrar secção critica e da liberdade a outro thread para entrar
+pthread_join(threadId, NULL); para que um determinado thread espere por outro; no nosso caso temos mais q 2 e portanto temos q guardar o threadId[i] num array...
+*/
+
 typedef enum {
     N, E, S, O
 } Acesso;
@@ -62,8 +69,8 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
 void *tracker_viatura(void *arg) {                                                                                      // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
     pthread_t selfThread = pthread_self();
     if(pthread_detach(selfThread) != 0){
-    perror("thread detached failed.\n");
-    exit(1);
+        perror("thread detached failed.\n");
+        exit(1);
     }
     struct Viatura *viatura = (struct Viatura *) arg;
     printf("tracker: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
@@ -118,7 +125,7 @@ FILE* create_log_file() {
     if ((log = fopen(name,"w")) == NULL)
         return NULL;
 
-    fprintf(log_file, "t(ticks) ; id_viat ; destin ; t_estacion ; t_vida ; observ\n"); 					// 1st row in the gerador.log file
+    fprintf(log_file, "t(ticks) ; id_viat ; destin ; t_estacion ; t_vida ; observ\n"); 					                // 1st row in the gerador.log file
 
     return log_file;
 }
