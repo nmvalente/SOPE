@@ -5,7 +5,6 @@
 #include <sys/errno.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <time.h>
 
 #define N_ACESSOS       4
 #define N_TEMPOS        10
@@ -58,7 +57,9 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
     free(req);
 }
 
-void *tracker_viatura(void *agr); // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
+void *tracker_viatura(void *arg) {                                                                                      // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
+    return arg;
+};
 
 int main(int argc, char *argv[]) {
     clock_t start_time;
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]) {
     if (argc != 3
         || (t_geracao = parse_uint(argv[1])) == UINT_MAX
         || (u_relogio = parse_uint(argv[2])) == UINT_MAX) {                                                             // number of arguments must be 2 and both arguments must be integers
-        fprintf(stderr, "Usage: %s <T_GERACAO> <U_RELOGIO>\n", argv[0]);
+        printf("Usage: %s <T_GERACAO> <U_RELOGIO>\n", argv[0]);
         exit(1);
     }
     // create_MUTEX();
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
         else intervalo = 2 * u_relogio;
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
         struct Viatura *viatura = create_viatura(identificador, tempo, acesso);                                         // create new vehicle
-        pthread_t *thread_viatua;
+        pthread_t *thread_viatua = NULL;
         pthread_create(thread_viatua, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
     }
 }

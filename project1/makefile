@@ -2,9 +2,9 @@
 
 all: createdir bin/lsdir bin/rmdup
 
-createdir: 
+createdir:
 	mkdir -p bin/
-	
+
 bin/lsdir: lsdir.c
 	gcc -Wall -o bin/lsdir lsdir.c
 
