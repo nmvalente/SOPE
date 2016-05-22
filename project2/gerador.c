@@ -58,7 +58,9 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
 }
 
 void *tracker_viatura(void *arg) {                                                                                      // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
-    return arg;
+    struct Viatura *viatura = (struct Viatura *) arg;
+    printf("id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
+    exit(0);
 };
 
 int main(int argc, char *argv[]) {
@@ -90,9 +92,11 @@ int main(int argc, char *argv[]) {
         else intervalo = 2 * u_relogio;
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
         struct Viatura *viatura = create_viatura(identificador, tempo, acesso);                                         // create new vehicle
-        pthread_t *thread_viatua = NULL;
-        pthread_create(thread_viatua, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
+        printf("id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
+        pthread_t thread_viatua;
+        pthread_create(&thread_viatua, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
+        identificador++;
     }
-    return 0;
+    pthread_exit(NULL);
 }
 
