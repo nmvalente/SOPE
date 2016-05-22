@@ -52,15 +52,17 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
     struct timespec *req;
     req = malloc(sizeof(struct timespec));
     req->tv_sec = (time_t) (seconds);
-    req->tv_nsec = (long) (seconds * SEC2NANO);
+    req->tv_nsec = (long) (seconds * SEC2NANO - req->tv_sec * SEC2NANO);
+    printf("sleep: %u %ld\n", ticks, req->tv_nsec);
     nanosleep(req, NULL);
     free(req);
 }
 
 void *tracker_viatura(void *arg) {                                                                                      // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
     struct Viatura *viatura = (struct Viatura *) arg;
-    printf("id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
-    exit(0);
+    printf("tracker: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
+    free(viatura);
+    return NULL;
 };
 
 int main(int argc, char *argv[]) {
@@ -76,6 +78,7 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s <T_GERACAO> <U_RELOGIO>\n", argv[0]);
         exit(1);
     }
+    long t_geracao_ticks = t_geracao * ticks_seg;
     // create_MUTEX();
     srand((unsigned) time(NULL));
     unsigned identificador = 0;
@@ -83,7 +86,7 @@ int main(int argc, char *argv[]) {
     unsigned short pre_intervalo;
     unsigned intervalo;
     Acesso acesso;
-    while ((double)((times(&now_tms)) - start_time) / ticks_seg < t_geracao) {
+    while (times(&now_tms) - start_time < t_geracao_ticks) {
         acesso = (Acesso) (rand() % N_ACESSOS);                                                                         // randomly get N, E, S or O for park access
         tempo = (rand() % N_TEMPOS + 1) * u_relogio;                                                                    // random parking time
         pre_intervalo = (unsigned short) (rand() % N_INTERVALOS);
@@ -92,10 +95,15 @@ int main(int argc, char *argv[]) {
         else intervalo = 2 * u_relogio;
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
         struct Viatura *viatura = create_viatura(identificador, tempo, acesso);                                         // create new vehicle
+        printf("viatura: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
         pthread_t thread_viatura;
-        pthread_create(&thread_viatura, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
+        if (pthread_create(&thread_viatura, NULL, tracker_viatura, viatura) != 0) {                                     // create vehicle tracker thread
+            printf("Error creating vehicle thread!");
+            exit(2);
+        }
+        pthread_detach(thread_viatura);
         identificador++;
     }
-    pthread_exit(NULL);
+    return 0;
 }
 
