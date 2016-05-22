@@ -93,5 +93,6 @@ int main(int argc, char *argv[]) {
         pthread_t *thread_viatua = NULL;
         pthread_create(thread_viatua, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
     }
+    return 0;
 }
 
