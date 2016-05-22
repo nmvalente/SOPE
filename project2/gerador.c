@@ -12,6 +12,7 @@
 #define PROB_INT_0      5
 #define PROB_INT_1      8
 #define SEC2NANO        1000000000
+#define LOG "gerador.log"
 
 typedef enum {
     N, E, S, O
@@ -59,10 +60,15 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
 }
 
 void *tracker_viatura(void *arg) {                                                                                      // ?? mudar nome disto e ainda não sei muito bem o que tem que fazer
+    pthread_t selfThread = pthread_self();
+    if(pthread_detach(selfThread) != 0){
+    perror("thread detached failed.\n");
+    exit(1);
+    }
     struct Viatura *viatura = (struct Viatura *) arg;
     printf("tracker: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
     free(viatura);
-    return NULL;
+    return NULL; 													// or pthread_exit(NULL);
 };
 
 int main(int argc, char *argv[]) {
@@ -105,5 +111,15 @@ int main(int argc, char *argv[]) {
         identificador++;
     }
     return 0;
+}
+
+FILE* create_log_file() {
+    FILE* log;
+    if ((log = fopen(name,"w")) == NULL)
+        return NULL;
+
+    fprintf(log_file, "t(ticks) ; id_viat ; destin ; t_estacion ; t_vida ; observ\n"); 					// 1st row in the gerador.log file
+
+    return log_file;
 }
 
