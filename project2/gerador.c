@@ -53,7 +53,7 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
     req = malloc(sizeof(struct timespec));
     req->tv_sec = (time_t) (seconds);
     req->tv_nsec = (long) (seconds * SEC2NANO - req->tv_sec * SEC2NANO);
-    printf("sleep: %u %ld\n", ticks, req->tv_nsec);
+    printf("sleep: %u ticks, %d sec, %ld nsec\n", ticks, (int)req->tv_sec, req->tv_nsec);
     nanosleep(req, NULL);
     free(req);
 }
