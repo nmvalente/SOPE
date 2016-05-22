@@ -262,12 +262,9 @@ int main(int argc, char *argv[]) {
     Acesso acesso;
     pthread_mutex_t mutex_fifo = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
-    struct stat dir_stat = {0};
-    if (stat(FIFO_DIR, &dir_stat) == -1) {
-        if (mkdir(FIFO_DIR, 0777) == -1) {
-            printf("error creating %s directory: %s\n", FIFO_DIR, strerror(errno));
-            exit(2);
-        }
+    if (mkdir(FIFO_DIR, 0777) == -1 && errno != EEXIST) {                                                               // could not create directory and it is not because it already exists
+        printf("error creating %s directory: %s\n", FIFO_DIR, strerror(errno));
+        exit(2);
     }
     if (!create_log_file()) {
         printf("error creating log file for generator");
