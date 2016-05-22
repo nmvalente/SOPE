@@ -23,7 +23,7 @@
 #define FIFO_O          "tmp/fifoO"
 #define FIFO            "tmp/fifo"
 #define FIFO_NAME_SIZE  19
-#define FIFO_CONTENT    50
+#define FIFO_PARQ_SIZE  50
 
 /*
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; variavel global com inicializacao do mutex;
@@ -37,7 +37,7 @@ typedef enum {
 } Acesso;
 
 typedef enum {
-    entrada, cheio, saida, fechado
+    entrada, cheio, saida, encerrado
 } Evento;
 
 struct Viatura {
@@ -46,18 +46,20 @@ struct Viatura {
     Acesso acesso;                                                                                                      // park access for vehicle
     clock_t start;                                                                                                      // start time of vehicle
     clock_t start_gen;                                                                                                  // start time of generator
-    pthread_mutex_t *mutex;                                                                                             // generator mutex
+    pthread_mutex_t *mutex_fifo;                                                                                        // generator mutex for fifo
+    pthread_mutex_t *mutex_log;                                                                                         // generator mutex for log
 };
 
-struct Viatura *create_viatura(unsigned identificador, unsigned tempo, Acesso acesso,
-                               clock_t start, clock_t start_gen, pthread_mutex_t *mutex) {
+struct Viatura *create_viatura(unsigned identificador, unsigned tempo, Acesso acesso, clock_t start,
+                               clock_t start_gen, pthread_mutex_t *mutex_fifo, pthread_mutex_t *mutex_log) {
     struct Viatura *viatura = malloc(sizeof(struct Viatura));
     viatura->identificador = identificador;
     viatura->tempo = tempo;
     viatura->acesso = acesso;
     viatura->start = start;
     viatura->start_gen = start_gen;
-    viatura->mutex = mutex;
+    viatura->mutex_fifo = mutex_fifo;
+    viatura->mutex_log = mutex_log;
     return viatura;
 }
 
@@ -121,8 +123,8 @@ char* get_evento(Evento evento) {
             return "cheio!";
         case saida:
             return "saida";
-        case fechado:
-            return "fechado!";
+        case encerrado:
+            return "encerrado!";
     }
     return NULL;
 }
@@ -160,7 +162,7 @@ unsigned short log_event(struct Viatura *viatura, Evento evento) {
     return 1;
 }
 
-void *tracker_viatura(void *arg) {                                                                                      
+void *tracker_viatura(void *arg) {
     if(pthread_detach(pthread_self()) != 0){
         perror("error detaching vehicle thread\n");
         exit(3);
@@ -176,35 +178,66 @@ void *tracker_viatura(void *arg) {
         free(viatura);
         exit(5);
     }
-    pthread_mutex_lock(viatura->mutex);                                                                                 // lock mutex
+    pthread_mutex_lock(viatura->mutex_fifo);                                                                            // lock mutex fifo
     char *fifo_parque = get_fifo(viatura->acesso);
     int fd = open(fifo_parque, O_WRONLY | O_NONBLOCK);
     if (fd == -1) {
         perror(fifo_parque);
         free(viatura);
-        pthread_mutex_unlock(viatura->mutex);
+        pthread_mutex_unlock(viatura->mutex_fifo);
         exit(6);
     }
-    char fifo_content[FIFO_CONTENT];
-    snprintf(fifo_content, FIFO_CONTENT, "%s ; %10u ; %10u; %s\n",
-             get_acesso(viatura->acesso), viatura->tempo, viatura->identificador, fifo_viatura);
-    if (write(fd, fifo_content, sizeof(fifo_content)) == -1) {
+    char fifo_parque_content[FIFO_PARQ_SIZE];
+    snprintf(fifo_parque_content, FIFO_PARQ_SIZE, "%u ; %10u ; %10u ; %s\n",
+             (unsigned) get_acesso(viatura->acesso), viatura->tempo, viatura->identificador, fifo_viatura);
+    if (write(fd, fifo_parque_content, sizeof(fifo_parque_content)) == -1) {
         printf("error writing to %s\n", fifo_parque);
         unlink(fifo_viatura);
         close(fd);
         free(viatura);
-        pthread_mutex_unlock(viatura->mutex);
+        pthread_mutex_unlock(viatura->mutex_fifo);
         exit(7);
     }
     close(fd);
 #ifdef DEBUG_GERADOR
-    printf("tracker: id %u write %s\n", viatura->identificador, fifo_parque);
+    printf("%s", fifo_parque_content);
 #endif
-    pthread_mutex_unlock(viatura->mutex);                                                                               // unlock mutex
-
-
-
-
+    pthread_mutex_unlock(viatura->mutex_fifo);                                                                          // unlock mutex fifo
+    fd = open(fifo_viatura, O_RDONLY);
+    if (fd == -1) {
+        perror(fifo_viatura);
+        unlink(fifo_viatura);
+        free(viatura);
+        exit(8);
+    }
+    char evento;
+#ifdef DEBUG_GERADOR
+    printf("tracker: id %u waiting read %s\n", viatura->identificador, fifo_viatura);
+#endif
+    if (read(fd, &evento, sizeof(char)) == -1) {
+        printf("error reading %s\n", fifo_viatura);
+        unlink(fifo_viatura);
+        close(fd);
+        free(viatura);
+        exit(9);
+    }
+    pthread_mutex_lock(viatura->mutex_log);                                                                             // lock mutex log
+    log_event(viatura, (Evento) evento);
+    pthread_mutex_unlock(viatura->mutex_log);                                                                           // unlock mutex log
+    if (evento == entrada) {
+        if (read(fd, &evento, sizeof(char)) == -1) {
+            printf("error reading %s\n", fifo_viatura);
+            unlink(fifo_viatura);
+            close(fd);
+            free(viatura);
+            exit(10);
+        }
+        pthread_mutex_lock(viatura->mutex_log);                                                                         // lock mutex log
+        log_event(viatura, (Evento) evento);
+        pthread_mutex_unlock(viatura->mutex_log);                                                                       // unlock mutex log
+    }
+    unlink(fifo_viatura);
+    close(fd);
     free(viatura);
     return NULL; 													                                                    // or pthread_exit(NULL);
 };
@@ -225,7 +258,8 @@ int main(int argc, char *argv[]) {
     srand((unsigned) time(NULL));
     unsigned identificador = 0, tempo, pre_intervalo, intervalo;
     Acesso acesso;
-    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mutex_fifo = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
     if (!create_log_file()) {
         printf("error creating log file for generator");
         exit(4);
@@ -238,7 +272,8 @@ int main(int argc, char *argv[]) {
         else if (pre_intervalo < PROB_INT_1) intervalo = u_relogio;
         else intervalo = 2 * u_relogio;
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
-        struct Viatura *viatura = create_viatura(identificador, tempo, acesso, times(&now_tms), start_time, &mutex);    // create new vehicle
+        struct Viatura *viatura = create_viatura(identificador, tempo, acesso, times(&now_tms),
+                                                 start_time, &mutex_fifo, &mutex_log);                                  // create new vehicle
 #ifdef DEBUG_GERADOR
         printf("viatura: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
 #endif
