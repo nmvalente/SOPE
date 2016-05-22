@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <memory.h>
 
 #define DEBUG_GERADOR   1
 
@@ -17,6 +18,7 @@
 #define PROB_INT_1      8
 #define SEC2NANO        1000000000
 #define LOG_FILE        "gerador.log"
+#define FIFO_DIR        "tmp/"
 #define FIFO_N          "tmp/fifoN"
 #define FIFO_E          "tmp/fifoE"
 #define FIFO_S          "tmp/fifoS"
@@ -165,18 +167,18 @@ unsigned short log_event(struct Viatura *viatura, Evento evento) {
 void *tracker_viatura(void *arg) {
     if(pthread_detach(pthread_self()) != 0){
         perror("error detaching vehicle thread\n");
-        exit(3);
+        exit(5);
     }
     struct Viatura *viatura = (struct Viatura *) arg;
 #ifdef DEBUG_GERADOR
     printf("tracker: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
 #endif
     char fifo_viatura[FIFO_NAME_SIZE];
-    snprintf(fifo_viatura, FIFO_NAME_SIZE, "%s %u", FIFO, viatura->identificador);
+    snprintf(fifo_viatura, FIFO_NAME_SIZE, "%s%u", FIFO, viatura->identificador);
     if (mkfifo(fifo_viatura, S_IRWXU) != 0) {
         perror(fifo_viatura);
         free(viatura);
-        exit(5);
+        exit(6);
     }
     pthread_mutex_lock(viatura->mutex_fifo);                                                                            // lock mutex fifo
     char *fifo_parque = get_fifo(viatura->acesso);
@@ -185,30 +187,30 @@ void *tracker_viatura(void *arg) {
         perror(fifo_parque);
         free(viatura);
         pthread_mutex_unlock(viatura->mutex_fifo);
-        exit(6);
+        exit(7);
     }
     char fifo_parque_content[FIFO_PARQ_SIZE];
-    snprintf(fifo_parque_content, FIFO_PARQ_SIZE, "%u ; %10u ; %10u ; %s\n",
-             (unsigned) get_acesso(viatura->acesso), viatura->tempo, viatura->identificador, fifo_viatura);
+    snprintf(fifo_parque_content, FIFO_PARQ_SIZE, "%s ; %10u ; %10u ; %s\n",
+             get_acesso(viatura->acesso), viatura->tempo, viatura->identificador, fifo_viatura);
     if (write(fd, fifo_parque_content, sizeof(fifo_parque_content)) == -1) {
         printf("error writing to %s\n", fifo_parque);
         unlink(fifo_viatura);
         close(fd);
         free(viatura);
         pthread_mutex_unlock(viatura->mutex_fifo);
-        exit(7);
+        exit(8);
     }
     close(fd);
+    pthread_mutex_unlock(viatura->mutex_fifo);                                                                          // unlock mutex fifo
 #ifdef DEBUG_GERADOR
     printf("%s", fifo_parque_content);
 #endif
-    pthread_mutex_unlock(viatura->mutex_fifo);                                                                          // unlock mutex fifo
     fd = open(fifo_viatura, O_RDONLY);
     if (fd == -1) {
         perror(fifo_viatura);
         unlink(fifo_viatura);
         free(viatura);
-        exit(8);
+        exit(9);
     }
     char evento;
 #ifdef DEBUG_GERADOR
@@ -219,7 +221,7 @@ void *tracker_viatura(void *arg) {
         unlink(fifo_viatura);
         close(fd);
         free(viatura);
-        exit(9);
+        exit(10);
     }
     pthread_mutex_lock(viatura->mutex_log);                                                                             // lock mutex log
     log_event(viatura, (Evento) evento);
@@ -230,7 +232,7 @@ void *tracker_viatura(void *arg) {
             unlink(fifo_viatura);
             close(fd);
             free(viatura);
-            exit(10);
+            exit(11);
         }
         pthread_mutex_lock(viatura->mutex_log);                                                                         // lock mutex log
         log_event(viatura, (Evento) evento);
@@ -260,9 +262,16 @@ int main(int argc, char *argv[]) {
     Acesso acesso;
     pthread_mutex_t mutex_fifo = PTHREAD_MUTEX_INITIALIZER;
     pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
+    struct stat dir_stat = {0};
+    if (stat(FIFO_DIR, &dir_stat) == -1) {
+        if (mkdir(FIFO_DIR, 0777) == -1) {
+            printf("error creating %s directory: %s\n", FIFO_DIR, strerror(errno));
+            exit(2);
+        }
+    }
     if (!create_log_file()) {
         printf("error creating log file for generator");
-        exit(4);
+        exit(3);
     }
     while (times(&now_tms) - start_time < t_geracao_ticks) {
         acesso = (Acesso) (rand() % N_ACESSOS);                                                                         // randomly get N, E, S or O for park access
@@ -280,7 +289,7 @@ int main(int argc, char *argv[]) {
         pthread_t thread_viatura;
         if (pthread_create(&thread_viatura, NULL, tracker_viatura, viatura) != 0) {                                     // create vehicle tracker thread
             printf("error creating vehicle thread");
-            exit(2);
+            exit(4);
         }
         identificador++;                                                                                                // no pthread_detach(thread_viatura) - thread detaches itself
     }
