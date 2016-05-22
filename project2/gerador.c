@@ -93,8 +93,8 @@ int main(int argc, char *argv[]) {
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
         struct Viatura *viatura = create_viatura(identificador, tempo, acesso);                                         // create new vehicle
         printf("id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
-        pthread_t thread_viatua;
-        pthread_create(&thread_viatua, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
+        pthread_t thread_viatura;
+        pthread_create(&thread_viatura, NULL, tracker_viatura, viatura);                                                  // create vehicle tracker thread
         identificador++;
     }
     pthread_exit(NULL);
