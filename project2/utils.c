@@ -7,9 +7,9 @@
 
 #include "utils.h"
 
-struct Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso, clock_t start,
+Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso, clock_t start,
                                clock_t start_gen, pthread_mutex_t *mutex_fifo, pthread_mutex_t *mutex_log) {
-    struct Viatura *viatura = malloc(sizeof(struct Viatura));
+    Viatura *viatura = malloc(sizeof(Viatura));
     viatura->identificador = identificador;
     viatura->tempo = tempo;
     viatura->acesso = acesso;
@@ -18,6 +18,41 @@ struct Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso,
     viatura->mutex_fifo = mutex_fifo;
     viatura->mutex_log = mutex_log;
     return viatura;
+}
+
+Viat *create_viat(int identificador, unsigned tempo, Acesso acesso) {
+    Viat *viat = malloc(sizeof(Viat));
+    viat->identificador = identificador;
+    viat->tempo = tempo;
+    viat->acesso = acesso;
+    snprintf(viat->fifo, FIFO_NAME_SIZE, "%s%u", FIFO, identificador);
+    return viat;
+}
+
+Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, unsigned n_lugares,
+                                  unsigned *n_ocupados, clock_t start_par, pthread_mutex_t *mutex) {
+    Parking_Viat *viat = malloc(sizeof(Parking_Viat));
+    viat->identificador = identificador;
+    viat->tempo = tempo;
+    viat->acesso = acesso;
+    snprintf(viat->fifo, FIFO_NAME_SIZE, "%s%u", FIFO, identificador);
+    viat->n_lugares = n_lugares;
+    viat->n_ocupados = n_ocupados;
+    viat->start_par = start_par;
+    viat->mutex = mutex;
+    return viat;
+}
+
+Controlador *create_controlador(Acesso acesso, unsigned n_lugares, unsigned *n_ocupados,
+                                int *retval, clock_t start_par, pthread_mutex_t *mutex) {
+    Controlador *controlador = malloc(sizeof(Controlador));
+    controlador->acesso = acesso;
+    controlador->n_lugares = n_lugares;
+    controlador->n_ocupados = n_ocupados;
+    controlador->retval = retval;
+    controlador->start_par = start_par;
+    controlador->mutex = mutex;
+    return controlador;
 }
 
 char* get_acesso(Acesso acesso) {
@@ -34,7 +69,7 @@ char* get_acesso(Acesso acesso) {
     return NULL;
 }
 
-char* get_evento(Evento evento) {
+char* get_evento_ger(Evento evento) {
     switch (evento) {
         case entrada:
             return "entrada";
@@ -44,6 +79,20 @@ char* get_evento(Evento evento) {
             return "saida";
         case encerrado:
             return "encerrado!";
+    }
+    return NULL;
+}
+
+char* get_evento_par(Evento evento) {
+    switch (evento) {
+        case entrada:
+            return "estacionamento";
+        case cheio:
+            return "cheio";
+        case saida:
+            return "saida";
+        case encerrado:
+            return "encerrado";
     }
     return NULL;
 }
@@ -62,17 +111,7 @@ char* get_fifo(Acesso acesso) {
     return NULL;
 }
 
-void get_fifo_viatura(struct Viatura *viatura, char *fifo_viatura) {
-    snprintf(fifo_viatura, FIFO_NAME_SIZE, "%s%u", FIFO, viatura->identificador);
-}
-
-void get_fifo_parque_content(struct Viatura *viatura, char *fifo_parque_content, char *fifo_viatura) {
-    snprintf(fifo_parque_content, FIFO_PARQ_SIZE, "%s ; %10u ; %10u ; %s\n",
-             get_acesso(viatura->acesso), viatura->tempo, viatura->identificador, fifo_viatura);
-}
-
-
-unsigned parse_uint(char *str) {                                                                                 // to parse string argument to unsigned integer
+unsigned parse_uint(char *str) {                                                                                        // to parse string argument to unsigned integer
     errno = 0;
     char *endptr;
     unsigned val;
@@ -94,7 +133,7 @@ void ticksleep(unsigned ticks, long ticks_seg) {                                
     req = malloc(sizeof(struct timespec));
     req->tv_sec = (time_t) (seconds);
     req->tv_nsec = (long) (seconds * SEC2NANO - req->tv_sec * SEC2NANO);
-#ifdef DEBUG_GERADOR
+#ifdef DEBUG
     printf("sleep: %u ticks, %d sec, %ld nsec\n", ticks, (int)req->tv_sec, req->tv_nsec);
 #endif
     nanosleep(req, NULL);

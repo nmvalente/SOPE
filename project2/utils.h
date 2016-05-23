@@ -10,7 +10,6 @@
 #define FIFO_O          "tmp/fifoO"
 #define FIFO            "tmp/fifo"
 #define FIFO_NAME_SIZE  19
-#define FIFO_PARQ_SIZE  50
 #define FIFO_MODE       0660
 
 typedef enum {
@@ -21,7 +20,7 @@ typedef enum {
     entrada, cheio, saida, encerrado
 } Evento;
 
-struct Viatura {
+typedef struct {
     int identificador;                                                                                                  // unique identifier for vehicle
     unsigned tempo;                                                                                                     // parking time for vehicle
     Acesso acesso;                                                                                                      // park access for vehicle
@@ -29,20 +28,53 @@ struct Viatura {
     clock_t start_gen;                                                                                                  // start time of generator
     pthread_mutex_t *mutex_fifo;                                                                                        // generator mutex for fifo
     pthread_mutex_t *mutex_log;                                                                                         // generator mutex for log
-};
+} Viatura;
 
-struct Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso, clock_t start,
+typedef struct {
+    int identificador;                                                                                                  // unique identifier for vehicle
+    unsigned tempo;                                                                                                     // parking time for vehicle
+    Acesso acesso;                                                                                                      // park access for vehicle
+    char fifo[FIFO_NAME_SIZE];                                                                                          // vehicle fifo
+} Viat;
+
+typedef struct {
+    int identificador;                                                                                                  // unique identifier for vehicle
+    unsigned tempo;                                                                                                     // parking time for vehicle
+    Acesso acesso;                                                                                                      // park access for vehicle
+    char fifo[FIFO_NAME_SIZE];                                                                                          // vehicle fifo
+    unsigned n_lugares;                                                                                                 // park total number of spaces
+    unsigned *n_ocupados;                                                                                               // park numbr of occupied spaces
+    clock_t start_par;                                                                                                  // start time of park
+    pthread_mutex_t *mutex;                                                                                             // park mutex
+} Parking_Viat;
+
+typedef struct {
+    Acesso acesso;                                                                                                      // park access of controller
+    unsigned n_lugares;                                                                                                 // total number of parking spaces
+    unsigned *n_ocupados;                                                                                               // occupied parking spaces
+    int *retval;                                                                                                        // return value for controller thread
+    clock_t start_par;                                                                                                  // start time of park
+    pthread_mutex_t *mutex;                                                                                             // park mutex
+} Controlador;
+
+Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso, clock_t start,
                                clock_t start_gen, pthread_mutex_t *mutex_fifo, pthread_mutex_t *mutex_log);
+
+Viat *create_viat(int identificador, unsigned tempo, Acesso acesso);
+
+Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, unsigned n_lugares,
+                                  unsigned *n_ocupados, clock_t start_par, pthread_mutex_t *mutex);
+
+Controlador *create_controlador(Acesso acesso, unsigned n_lugares, unsigned *n_ocupados,
+                                int *retval, clock_t start_par, pthread_mutex_t *mutex);
 
 char* get_acesso(Acesso acesso);
 
-char* get_evento(Evento evento);
+char* get_evento_ger(Evento evento);
+
+char* get_evento_par(Evento evento);
 
 char* get_fifo(Acesso acesso);
-
-void get_fifo_viatura(struct Viatura *viatura, char *fifo_viatura);
-
-void get_fifo_parque_content(struct Viatura *viatura, char *fifo_parque_content, char *fifo_viatura);
 
 unsigned parse_uint(char *str);
 

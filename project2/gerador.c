@@ -11,20 +11,13 @@
 
 #include "utils.h"
 
-#define DEBUG_GERADOR   1
+#define DEBUG           1
 
 #define N_TEMPOS        10
 #define N_INTERVALOS    10
 #define PROB_INT_0      5
 #define PROB_INT_1      8
 #define LOG_FILE        "gerador.log"
-
-/*
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER; variavel global com inicializacao do mutex;
-pthread_mutex_lock(&mutex); bloqueia para iniciar secção critica
-pthread_mutex_unlock(&mutex); desbloqueia para encerrar secção critica e da liberdade a outro thread para entrar
-pthread_join(threadId, NULL); para que um determinado thread espere por outro; no nosso caso temos mais q 2 e portanto temos q guardar o threadId[i] num array...
-*/
 
 unsigned short create_log_file() {
     FILE *log_file;
@@ -35,9 +28,9 @@ unsigned short create_log_file() {
     return 1;
 }
 
-unsigned short log_event(struct Viatura *viatura, Evento evento) {
+unsigned short log_event(Viatura *viatura, Evento evento) {
     FILE *log_file;
-    if ((log_file = fopen(LOG_FILE, "w")) == NULL)
+    if ((log_file = fopen(LOG_FILE, "a")) == NULL)
         return 0;
     struct tms now_tms;
     clock_t now = times(&now_tms);
@@ -49,87 +42,77 @@ unsigned short log_event(struct Viatura *viatura, Evento evento) {
         fprintf(log_file, "%6d ; ", (int) (now - viatura->start));
     else
         fprintf(log_file, "     ? ; ");
-    fprintf(log_file, "%s\n", get_evento(evento));
+    fprintf(log_file, "%s\n", get_evento_ger(evento));
     fclose(log_file);
     return 1;
 }
 
+void close_exit(Viatura *viatura, Viat *viat, int clos, char *unlin, int exi) {
+    if (clos >= 0) close(clos);
+    if (unlin != NULL) unlink(unlin);
+    free(viatura);
+    free(viat);
+    if (exi >= 0) exit(exi);
+}
+
 void *tracker_viatura(void *arg) {
-    if(pthread_detach(pthread_self()) != 0){
+    if(pthread_detach(pthread_self()) != 0) {
         perror("error detaching vehicle thread\n");
         exit(5);
     }
-    struct Viatura *viatura = (struct Viatura *) arg;
-#ifdef DEBUG_GERADOR
+    Viatura *viatura = (Viatura *) arg;
+#ifdef DEBUG
     printf("tracker: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
 #endif
-    char fifo_viatura[FIFO_NAME_SIZE];
-    get_fifo_viatura(viatura, fifo_viatura);
-    if (mkfifo(fifo_viatura, FIFO_MODE) != 0) {
-        perror(fifo_viatura);
-        free(viatura);
-        exit(6);
+    Viat *viat = create_viat(viatura->identificador, viatura->tempo, viatura->acesso);
+    if (mkfifo(viat->fifo, FIFO_MODE) != 0) {
+        perror(viat->fifo);
+        close_exit(viatura, viat, -1, NULL, 6);
     }
     pthread_mutex_lock(viatura->mutex_fifo);                                                                            // lock mutex fifo
     char *fifo_parque = get_fifo(viatura->acesso);
     int fd = open(fifo_parque, O_WRONLY | O_NONBLOCK);
     if (fd == -1) {
         perror(fifo_parque);
-        free(viatura);
         pthread_mutex_unlock(viatura->mutex_fifo);
-        exit(7);
+        close_exit(viatura, viat, -1, NULL, 7);
     }
-    char fifo_parque_content[FIFO_PARQ_SIZE];
-    get_fifo_parque_content(viatura, fifo_parque_content, fifo_viatura);
-    if (write(fd, fifo_parque_content, sizeof(fifo_parque_content)) == -1) {
+    if (write(fd, viat, sizeof(Viat)) == -1) {
         printf("error writing to %s\n", fifo_parque);
-        unlink(fifo_viatura);
-        close(fd);
-        free(viatura);
         pthread_mutex_unlock(viatura->mutex_fifo);
-        exit(8);
+        close_exit(viatura, viat, fd, viat->fifo, 8);
     }
     close(fd);
     pthread_mutex_unlock(viatura->mutex_fifo);                                                                          // unlock mutex fifo
-#ifdef DEBUG_GERADOR
-    printf("%s", fifo_parque_content);
+#ifdef DEBUG
+    printf("%s ; %10u ; %10u ; %s\n", get_acesso(viat->acesso), viat->tempo, viat->identificador, viat->fifo);
 #endif
-    fd = open(fifo_viatura, O_RDONLY);
+    fd = open(viat->fifo, O_RDONLY);
     if (fd == -1) {
-        perror(fifo_viatura);
-        unlink(fifo_viatura);
-        free(viatura);
-        exit(9);
+        perror(viat->fifo);
+        close_exit(viatura, viat, -1, viat->fifo, 9);
     }
     char evento;
-#ifdef DEBUG_GERADOR
-    printf("tracker: id %u waiting read %s\n", viatura->identificador, fifo_viatura);
+#ifdef DEBUG
+    printf("tracker: id %u waiting read %s\n", viat->identificador, viat->fifo);
 #endif
     if (read(fd, &evento, sizeof(char)) == -1) {
-        printf("error reading %s\n", fifo_viatura);
-        unlink(fifo_viatura);
-        close(fd);
-        free(viatura);
-        exit(10);
+        printf("error reading %s\n", viat->fifo);
+        close_exit(viatura, viat, fd, viat->fifo, 10);
     }
     pthread_mutex_lock(viatura->mutex_log);                                                                             // lock mutex log
     log_event(viatura, (Evento) evento);
     pthread_mutex_unlock(viatura->mutex_log);                                                                           // unlock mutex log
     if (evento == entrada) {
         if (read(fd, &evento, sizeof(char)) == -1) {
-            printf("error reading %s\n", fifo_viatura);
-            unlink(fifo_viatura);
-            close(fd);
-            free(viatura);
-            exit(11);
+            printf("error reading %s\n", viat->fifo);
+            close_exit(viatura, viat, fd, viat->fifo, 11);
         }
         pthread_mutex_lock(viatura->mutex_log);                                                                         // lock mutex log
         log_event(viatura, (Evento) evento);
         pthread_mutex_unlock(viatura->mutex_log);                                                                       // unlock mutex log
     }
-    unlink(fifo_viatura);
-    close(fd);
-    free(viatura);
+    close_exit(viatura, viat, fd, viat->fifo, -1);
     pthread_exit(NULL);
 };
 
@@ -167,13 +150,12 @@ int main(int argc, char *argv[]) {
         else if (pre_intervalo < PROB_INT_1) intervalo = u_relogio;
         else intervalo = 2 * u_relogio;
         ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
-        struct Viatura *viatura = create_viatura(identificador, tempo, acesso, times(&now_tms),
+        Viatura *viatura = create_viatura(identificador, tempo, acesso, times(&now_tms),
                                                  start_time, &mutex_fifo, &mutex_log);                                  // create new vehicle
-#ifdef DEBUG_GERADOR
+#ifdef DEBUG
         printf("viatura: id %u, t %u, a %u\n", viatura->identificador, viatura->tempo, viatura->acesso);
 #endif
-        pthread_t thread_viatura;
-        if (pthread_create(&thread_viatura, NULL, tracker_viatura, viatura) != 0) {                                     // create vehicle tracker thread
+        if (pthread_create(NULL, NULL, tracker_viatura, viatura) != 0) {                                                // create vehicle tracker thread
             printf("error creating vehicle thread");
             exit(4);
         }

@@ -5,168 +5,195 @@
 #include <time.h>
 #include <pthread.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
-#include <semaphore.h>
+#include <sys/times.h>
 #include <fcntl.h>
 
 #include "utils.h"
 
+#define DEBUG           1
 
-#define OUT_OF_PARK 0
-#define IN_PARK	    1
-#define FULL        2
-#define CLOSED      3
-#define MAX_LENGHT 5000
+#define LOG_FILE        "parque.log"
 
+unsigned short create_log_file() {
+    FILE *log_file;
+    if ((log_file = fopen(LOG_FILE, "w")) == NULL)
+        return 0;
+    fprintf(log_file, "t(ticks) ; nlug ; id_viat ; observ\n");                                                          // first row in the parque.log file
+    fclose(log_file);
+    return 1;
+}
 
-void *car_assistant(void *arg){
+unsigned short log_event(clock_t start_par, int n_ocupados, int identificador, Evento evento) {
+    FILE *log_file;
+    if ((log_file = fopen(LOG_FILE, "a")) == NULL)
+        return 0;
+    struct tms now_tms;
+    clock_t now = times(&now_tms);
+    fprintf(log_file, "%8d ; ", (int) (now - start_par));
+    fprintf(log_file, "%4d ;      ", n_ocupados);
+    fprintf(log_file, "%7d ; ", identificador);
+    fprintf(log_file, "%s\n", get_evento_par(evento));
+    fclose(log_file);
+    return 1;
+}
 
-    Viatura vehicle = *(Viatura*) arg;
-    int fd, info_park;
+void close_exit_arru(Parking_Viat *viat, int clos, char *perro, int exi) {
+    if (perro != NULL) perror(perro);
+    if (clos >= 0) close(clos);
+    free(viat);
+    if (exi > 0) exit(exi);
+    else pthread_exit(NULL);
+}
 
-    char fifo[MAX_LENGHT];
-    sprintf(fifo, "/tmp/viatura%d", vehicle.identificador);
-
-    if((fd = open(fifo, O_WRONLY)) == -1){
-        closeAndError(fifo, fd, 4);
-        /*perror(fifo);
-        unlink(fifo);
-        close(fd);
-        exit(4);*/
+void *arrumador_viatura(void *arg) {
+    if(pthread_detach(pthread_self()) != 0) {
+        perror("error detaching parking assistant thread\n");
+        exit(10);
     }
-
-
-    if(parking_lots <= 0) // if no places to store the vehicle, full park
-    {
-        info_park = FULL;
-        if(write(fd, &info_park, sizeof(char)) == -1){
-            closeAndError(fifo, fd, 5);
-            /*perror(fifo);
-            unlink(fifo);
-            close(fd);
-            exit(5);*/
-        }
+    Parking_Viat *viat = (Parking_Viat*) arg;
+    pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
+    int fd = open(viat->fifo, O_WRONLY);
+    if (fd == -1)
+        close_exit_arru(viat, -1, viat->fifo, 11);
+    if (viat->n_lugares - *viat->n_ocupados <= 0) {                                                                     // parking lot is full
+        Evento evento = cheio;
+        if (write(fd, &evento, sizeof(char)) == -1)
+            close_exit_arru(viat, fd, viat->fifo, 12);
+        log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
+        pthread_mutex_unlock(viat->mutex);                                                                              // unlock mutex
+        close_exit_arru(viat, fd, NULL, 0);
     }
-    else{
-        info_park = IN_PARK;
-        if(write(fd, &info_park, sizeof(char)) == -1){
-            closeAndError(fifo, fd, 6);
-            /*perror(fifo);
-            unlink(fifo);
-            close(fd);
-            exit(6);*/
-        }
-        parking_lots--;
-        printf("vehicle.tempo = %d\n", vehicle.tempo);
-
-        // passado algum tempo o carro  vai sair do parque, precisamos de contar um tempo qq aqui
-
-        info_park = OUT_OF_PARK;
-        if (write(fd, &info_park, sizeof(char)) == -1){
-            closeAndError(fifo, fd, 7);
-            /*perror(fifo);
-            unlink(fifo);
-            close(fd);
-            exit(7);*/
-        }
-        parking_lots++;
-    }
+    (*viat->n_ocupados)++;
+    Evento evento = entrada;
+    if (write(fd, &evento, sizeof(char)) == -1)
+        close_exit_arru(viat, fd, viat->fifo, 13);
+    close(fd);
+    log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
+    pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
+    ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));
+    evento = saida;
+    pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
+    fd = open(viat->fifo, O_WRONLY);
+    if (fd == -1)
+        close_exit_arru(viat, -1, viat->fifo, 14);
+    (*viat->n_ocupados)--;
+    if (write(fd, &evento, sizeof(char)) == -1)
+        close_exit_arru(viat, fd, viat->fifo, 15);
+    close(fd);
+    log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
+    pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
+    close_exit_arru(viat, -1, NULL, 0);
     return NULL;
 }
 
-void *controller(void *arg){
-    char * fifo_gate = (char *) arg;
-    int fdr, closed = 0;
-    struct Viatura vehicle;
-    char info;
+void close_exit_cont(Controlador *controlador, Viat *viat, int clos, char *perro, int exi, int *retval) {
+    if (perro != NULL) perror(perro);
+    if (clos >= 0) close(clos);
+    free(controlador);
+    free(viat);
+    *retval = exi;
+    pthread_exit(retval);
+}
 
-    //open FIFO Read only
-    if((fdr = open(fifo_portao, O_RDONLY)) == -1){
-        closeAndError(fifo_gate, fdr, 8);
-        /*perror(fifo_gate);
-        unlink(fifo_gate);
-        close(fdr);
-        exit(8);*/
+Viat *readViat(int fd){
+    Viat* viat = malloc(sizeof(Viat *));
+    size_t size = sizeof(Viat);
+    size_t read_size = 0;
+    while(read_size != size){
+        ssize_t value = read(fd, viat + read_size, size - read_size);
+        if( value == -1 || value == 0) {
+            free(viat);
+            return NULL;
+        }
+        read_size += value;
     }
+    return viat;
+}
 
-    // FIFO not closed
-    while(read(fdr, &vehicle, sizeof(Viatura)) != 0){
-        if(vehicle.identificador == -1){ // if stop_vehicle
+void *tracker_controlador(void *arg) {
+    Controlador *controlador = (Controlador *) arg;
+    char *fifo = get_fifo(controlador->acesso);
+    int fdr = open(fifo, O_RDONLY);
+    if (fdr == -1)
+        close_exit_cont(controlador, NULL, -1, fifo, 5, controlador->retval);
+    Viat *viat;
+    int closed = 0;
+    while ((viat = readViat(fdr)) != NULL) {
+        if (viat->identificador == -1) {
             closed = 1;
+            continue;
         }
-
-        else if(closed){
-            int fd_generator;
-            char fifo[MAX_LENGHT];
-            sprintf(fifo, "/tmp/viatura%d", vehicle.identificador);
-            if((fd_generator = open(fifo, O_WRONLY)) == -1){
-                closeAndError(fifo, fd_generator, 9);
-                /*perror(fifo);
-                unlink(fifo);
-                close(fd_generator);
-                exit(9);*/
+        if (closed) {
+            pthread_mutex_lock(controlador->mutex);                                                                     // lock mutex
+            int fd = open(viat->fifo, O_WRONLY);
+            if (fd == -1)
+                close_exit_cont(controlador, viat, fdr, fifo, 7, controlador->retval);
+            Evento evento = encerrado;
+            if (write(fd, &evento, sizeof(char)) == -1) {
+                close(fd);
+                close_exit_cont(controlador, viat, fdr, fifo, 8, controlador->retval);
             }
-            info_park = CLOSED;
-            if(write(fd_generator, &info_park, sizeof(char)) == -1){
-                closeAndError(fifo, fd_generator, 10);
-                /*perror(fifo);
-                unlink(fifo);
-                close(fd_generator);
-                exit(10);*/
-            }
+            close(fd);
+            log_event(controlador->start_par, *controlador->n_ocupados, viat->identificador, evento);
+            pthread_mutex_unlock(controlador->mutex);                                                                   // unlock mutex
         }
-        else{
-            pthread_t tid;
-            if(pthread_create(&tid, NULL, car_assistant, &vehicle)){
-                printf("thread failed.\n");
-                exit(11);
+        else {
+            Parking_Viat *pviat = create_parking_viat(viat->identificador, viat->tempo, viat->acesso,
+                                                      controlador->n_lugares, controlador->n_ocupados,
+                                                      controlador->start_par, controlador->mutex);
+            if (pthread_create(NULL, NULL, arrumador_viatura, pviat) != 0) {
+                printf("error creating parking assistant thread");
+                close_exit_cont(controlador, NULL, fdr, NULL, 9, controlador->retval);
             }
-            pthread_detach(tid);
         }
     }
-    close(fdr);
-    unlink(fifo_gate);
+    unlink(fifo);
+    close_exit_cont(controlador, NULL, fdr, NULL, 0, controlador->retval);
     return NULL;
 }
 
-void closeAndError(char *fifo, int file_descriptor, int nr){
-    perror(fifo);
-    unlink(fifo);
-    close(file_descriptor);
-    exit(nr);
-}
-
-int main(int argc, char ** argv){
-    unsigned open_duration;
-    unsigned parking_lots;
+int main(int argc, char **argv) {
+    clock_t start_time;
+    struct tms start_tms;
+    start_time = times(&start_tms);
+    unsigned t_abertura;
+    unsigned n_lugares;
     if (argc != 3
-        || (parking_lots = parse_uint(argv[1])) == UINT_MAX
-        || (open_duration = parse_uint(argv[2])) == UINT_MAX) {                                                         // number of arguments must be 2 and both arguments must be integers
+        || (n_lugares = parse_uint(argv[1])) == UINT_MAX
+        || (t_abertura = parse_uint(argv[2])) == UINT_MAX) {                                                            // number of arguments must be 2 and both arguments must be integers
         printf("Usage: %s <N_LUGARES> <T_ABERTURA>\n", argv[0]);
         exit(1);
     }
-    pthread_mutex_t mutex_park = PTHREAD_MUTEX_INITIALIZER;                                                             // create MUTEX
+    unsigned n_ocupados = 0;
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;                                                                  // create fifo mutex
+    if (mkdir(FIFO_DIR, 0777) == -1 && errno != EEXIST) {                                                               // could not create directory and it is not because it already exists
+        printf("error creating %s directory: %s\n", FIFO_DIR, strerror(errno));
+        exit(2);
+    }
+    if (!create_log_file()) {
+        printf("error creating log file for parking lot");
+        exit(3);
+    }
     int fd[N_ACESSOS];
     pthread_t tid[N_ACESSOS];
-    char* fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
+    char *fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
+    Controlador *controladores[4];
+    int retvals[4];
     int i;
     for (i = 0; i < N_ACESSOS; i++) {
         mkfifo(fifos[i], FIFO_MODE);                                                                                    // create FIFO
-        pthread_create(&tid[i], NULL, controller, fifos[i]);                                                            // create controller
+        controladores[i] = create_controlador((Acesso) i, n_lugares, &n_ocupados, &retvals[i], start_time, &mutex);     // create controller
+        pthread_create(&tid[i], NULL, tracker_controlador, controladores[i]);                                           // create controller tracker thread
         fd[i] = open(fifos[i], O_WRONLY);                                                                               // open FIFO
     }
-    sleep(open_duration);
-    struct Viatura *stop_vehicle = create_viatura(-1, 0, N, NULL, NULL, NULL, NULL);
-    char fifo_viatura[FIFO_NAME_SIZE];
-    get_fifo_viatura(stop_vehicle, fifo_viatura);
-    char fifo_parque_content[FIFO_PARQ_SIZE];
-    get_fifo_parque_content(stop_vehicle, fifo_parque_content, fifo_viatura);
-    pthread_mutex_lock(&mutex_park);	                                                                                // wait MUTEX
+    sleep(t_abertura);
+    Viat *stop_vehicle = create_viat(-1, 0, N);
+    pthread_mutex_lock(&mutex);                                                                                         // lock mutex
     int j;
     for (i = 0; i < N_ACESSOS; i++) {
-        if (write(fd[i], fifo_parque_content, sizeof(fifo_parque_content)) == -1) {
+        if (write(fd[i], stop_vehicle, sizeof(Viat)) == -1) {
             printf("error writing to %s\n", FIFO_N);
             for (j = 0; j < N_ACESSOS; j++) {
                 unlink(fifos[j]);
@@ -176,10 +203,9 @@ int main(int argc, char ** argv){
             exit(4);
         }
         close(fd[i]);
-        pthread_join(tid[i], NULL);                                                                                     //wait_controller_end
-
+        pthread_join(tid[i], NULL);                                                                                     // wait controller end
     }
-    pthread_mutex_unlock(&mutex_park);	                                                                                //signal MUTEX
+    pthread_mutex_unlock(&mutex);                                                                                       // unlock mutex
     free(stop_vehicle);
     for (j = 0; j < N_ACESSOS; j++) {
         unlink(fifos[j]);
