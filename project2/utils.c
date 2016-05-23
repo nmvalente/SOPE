@@ -29,7 +29,7 @@ Viat *create_viat(int identificador, unsigned tempo, Acesso acesso) {
     return viat;
 }
 
-Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, unsigned n_lugares,
+Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, int n_lugares,
                                   unsigned *n_ocupados, clock_t start_par, pthread_mutex_t *mutex) {
     Parking_Viat *viat = malloc(sizeof(Parking_Viat));
     viat->identificador = identificador;
@@ -44,12 +44,11 @@ Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso aces
 }
 
 Controlador *create_controlador(Acesso acesso, unsigned n_lugares, unsigned *n_ocupados,
-                                int *retval, clock_t start_par, pthread_mutex_t *mutex) {
+                                clock_t start_par, pthread_mutex_t *mutex) {
     Controlador *controlador = malloc(sizeof(Controlador));
     controlador->acesso = acesso;
     controlador->n_lugares = n_lugares;
     controlador->n_ocupados = n_ocupados;
-    controlador->retval = retval;
     controlador->start_par = start_par;
     controlador->mutex = mutex;
     return controlador;

@@ -15,6 +15,7 @@
 #define DEBUG           1
 
 #define LOG_FILE        "parque.log"
+#define LOCK_FILE        "tmp/parque"
 
 unsigned short create_log_file() {
     FILE *log_file;
@@ -25,15 +26,15 @@ unsigned short create_log_file() {
     return 1;
 }
 
-unsigned short log_event(clock_t start_par, int n_ocupados, int identificador, Evento evento) {
+unsigned short log_event(Parking_Viat *viat, Evento evento) {
     FILE *log_file;
     if ((log_file = fopen(LOG_FILE, "a")) == NULL)
         return 0;
     struct tms now_tms;
     clock_t now = times(&now_tms);
-    fprintf(log_file, "%8d ; ", (int) (now - start_par));
-    fprintf(log_file, "%4d ;      ", n_ocupados);
-    fprintf(log_file, "%7d ; ", identificador);
+    fprintf(log_file, "%8d ; ", (int) (now - viat->start_par));
+    fprintf(log_file, "%4d ; ", *viat->n_ocupados);
+    fprintf(log_file, "%7d ; ", viat->identificador);
     fprintf(log_file, "%s\n", get_evento_par(evento));
     fclose(log_file);
     return 1;
@@ -50,9 +51,24 @@ void close_exit_arru(Parking_Viat *viat, int clos, char *perro, int exi) {
 void *arrumador_viatura(void *arg) {
     if(pthread_detach(pthread_self()) != 0) {
         perror("error detaching parking assistant thread\n");
-        exit(10);
+        exit(8);
     }
     Parking_Viat *viat = (Parking_Viat*) arg;
+    if (viat->n_lugares < 0) {                                                                                          // parking lot is closed: this is no longer used!
+        pthread_mutex_lock(viat->mutex);                                                                                // lock mutex
+        int fd = open(viat->fifo, O_WRONLY);
+        if (fd == -1)
+            close_exit_arru(viat, -1, viat->fifo, 9);
+        Evento evento = encerrado;
+        if (write(fd, &evento, sizeof(char)) == -1) {
+            close_exit_arru(viat, -1, viat->fifo, 10);
+        }
+        close(fd);
+        log_event(viat, evento);
+        pthread_mutex_unlock(viat->mutex);                                                                              // unlock mutex
+        close_exit_arru(viat, -1, NULL, 0);
+        pthread_exit(NULL);
+    }
     pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
     int fd = open(viat->fifo, O_WRONLY);
     if (fd == -1)
@@ -61,44 +77,48 @@ void *arrumador_viatura(void *arg) {
         Evento evento = cheio;
         if (write(fd, &evento, sizeof(char)) == -1)
             close_exit_arru(viat, fd, viat->fifo, 12);
-        log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
-        pthread_mutex_unlock(viat->mutex);                                                                              // unlock mutex
+        log_event(viat, evento);
+        pthread_mutex_unlock(viat->mutex);
         close_exit_arru(viat, fd, NULL, 0);
     }
     (*viat->n_ocupados)++;
-    Evento evento = entrada;
+    Evento evento = entrada;                                                                                            // vehicle parked
     if (write(fd, &evento, sizeof(char)) == -1)
         close_exit_arru(viat, fd, viat->fifo, 13);
-    close(fd);
-    log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
+    log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
-    ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));
-    evento = saida;
+    ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));                                                                       // waiting for parking session to end
+    evento = saida;                                                                                                     // vehicle left park
     pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
-    fd = open(viat->fifo, O_WRONLY);
-    if (fd == -1)
-        close_exit_arru(viat, -1, viat->fifo, 14);
     (*viat->n_ocupados)--;
     if (write(fd, &evento, sizeof(char)) == -1)
         close_exit_arru(viat, fd, viat->fifo, 15);
     close(fd);
-    log_event(viat->start_par, *viat->n_ocupados, viat->identificador, evento);
+    log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
     close_exit_arru(viat, -1, NULL, 0);
-    return NULL;
+    pthread_exit(NULL);
 }
 
-void close_exit_cont(Controlador *controlador, Viat *viat, int clos, char *perro, int exi, int *retval) {
+void close_exit_cont(Controlador *controlador, Viat *viat, int clos1, int clos2, char *perro, int exi) {
     if (perro != NULL) perror(perro);
-    if (clos >= 0) close(clos);
+    if (clos1 >= 0) close(clos1);
+    if (clos2 >= 0) close(clos2);
     free(controlador);
     free(viat);
-    *retval = exi;
-    pthread_exit(retval);
+    char *fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
+    int i;
+    for (i = 0; i < N_ACESSOS; i++) {
+        unlink(fifos[i]);
+    }
+    if (exi > 0)
+        unlink(LOCK_FILE);
+    rmdir(FIFO_DIR);
+    if (exi > 0) exit(exi);
 }
 
 Viat *readViat(int fd){
-    Viat* viat = malloc(sizeof(Viat *));
+    Viat* viat = malloc(sizeof(Viat));
     size_t size = sizeof(Viat);
     size_t read_size = 0;
     while(read_size != size){
@@ -115,43 +135,41 @@ Viat *readViat(int fd){
 void *tracker_controlador(void *arg) {
     Controlador *controlador = (Controlador *) arg;
     char *fifo = get_fifo(controlador->acesso);
+    mkfifo(fifo, 0644);                                                                                                 // create FIFO
     int fdr = open(fifo, O_RDONLY);
     if (fdr == -1)
-        close_exit_cont(controlador, NULL, -1, fifo, 5, controlador->retval);
+        close_exit_cont(controlador, NULL, -1, -1, fifo, 5);
+    int fdd = open(fifo, O_WRONLY | O_NONBLOCK);
+    if (fdd == -1)
+        close_exit_cont(controlador, NULL, fdr, -1, fifo, 6);
     Viat *viat;
     int closed = 0;
-    while ((viat = readViat(fdr)) != NULL) {
+    while (closed == 0 && (viat = readViat(fdr)) != NULL) {
+#ifdef DEBUG
+        printf("controlador %d: closed %d ocupados %d\n", controlador->acesso, closed, *controlador->n_ocupados);
+        printf("controlador %d: viatura %d recebida\n", controlador->acesso, viat->identificador);
+#endif
         if (viat->identificador == -1) {
             closed = 1;
             continue;
         }
-        if (closed) {
-            pthread_mutex_lock(controlador->mutex);                                                                     // lock mutex
-            int fd = open(viat->fifo, O_WRONLY);
-            if (fd == -1)
-                close_exit_cont(controlador, viat, fdr, fifo, 7, controlador->retval);
-            Evento evento = encerrado;
-            if (write(fd, &evento, sizeof(char)) == -1) {
-                close(fd);
-                close_exit_cont(controlador, viat, fdr, fifo, 8, controlador->retval);
-            }
-            close(fd);
-            log_event(controlador->start_par, *controlador->n_ocupados, viat->identificador, evento);
-            pthread_mutex_unlock(controlador->mutex);                                                                   // unlock mutex
+        Parking_Viat *pviat = create_parking_viat(viat->identificador, viat->tempo, viat->acesso,
+                                                  controlador->n_lugares, controlador->n_ocupados,
+                                                  controlador->start_par, controlador->mutex);
+        pthread_t thread_controlador;
+        if (pthread_create(&thread_controlador, NULL, arrumador_viatura, pviat) != 0) {
+            printf("error creating parking assistant thread");
+            close_exit_cont(controlador, NULL, fdr, fdd, NULL, 7);
         }
-        else {
-            Parking_Viat *pviat = create_parking_viat(viat->identificador, viat->tempo, viat->acesso,
-                                                      controlador->n_lugares, controlador->n_ocupados,
-                                                      controlador->start_par, controlador->mutex);
-            if (pthread_create(NULL, NULL, arrumador_viatura, pviat) != 0) {
-                printf("error creating parking assistant thread");
-                close_exit_cont(controlador, NULL, fdr, NULL, 9, controlador->retval);
-            }
-        }
+#ifdef DEBUG
+        printf("controlador %d: arrumador %d criado\n", controlador->acesso, viat->identificador);
+#endif
     }
-    unlink(fifo);
-    close_exit_cont(controlador, NULL, fdr, NULL, 0, controlador->retval);
-    return NULL;
+#ifdef DEBUG
+    printf("controlador %d: encerrado\n", controlador->acesso);
+#endif
+    close_exit_cont(controlador, NULL, fdr, fdd, NULL, 0);
+    pthread_exit(NULL);
 }
 
 int main(int argc, char **argv) {
@@ -172,43 +190,54 @@ int main(int argc, char **argv) {
         printf("error creating %s directory: %s\n", FIFO_DIR, strerror(errno));
         exit(2);
     }
+    FILE *lock_file;
+    if ((lock_file = fopen(LOCK_FILE, "w")) != NULL)
+        fclose(lock_file);
     if (!create_log_file()) {
         printf("error creating log file for parking lot");
         exit(3);
     }
     int fd[N_ACESSOS];
     pthread_t tid[N_ACESSOS];
-    char *fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
-    Controlador *controladores[4];
-    int retvals[4];
+    Controlador *controladores[N_ACESSOS];
     int i;
     for (i = 0; i < N_ACESSOS; i++) {
-        mkfifo(fifos[i], FIFO_MODE);                                                                                    // create FIFO
-        controladores[i] = create_controlador((Acesso) i, n_lugares, &n_ocupados, &retvals[i], start_time, &mutex);     // create controller
+        controladores[i] = create_controlador((Acesso) i, n_lugares, &n_ocupados, start_time, &mutex);                  // create controller
         pthread_create(&tid[i], NULL, tracker_controlador, controladores[i]);                                           // create controller tracker thread
-        fd[i] = open(fifos[i], O_WRONLY);                                                                               // open FIFO
+#ifdef DEBUG
+        printf("parque: controlador %d criado\n", (Acesso) i);
+#endif
     }
     sleep(t_abertura);
     Viat *stop_vehicle = create_viat(-1, 0, N);
     pthread_mutex_lock(&mutex);                                                                                         // lock mutex
     int j;
+    char *fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
     for (i = 0; i < N_ACESSOS; i++) {
+        fd[i] = open(fifos[i], O_WRONLY | O_NONBLOCK);                                                                  // open FIFO
         if (write(fd[i], stop_vehicle, sizeof(Viat)) == -1) {
-            printf("error writing to %s\n", FIFO_N);
+            printf("error writing to %s\n", fifos[i]);
             for (j = 0; j < N_ACESSOS; j++) {
                 unlink(fifos[j]);
                 close(fd[j]);
             }
+            unlink(LOCK_FILE);
+            rmdir(FIFO_DIR);
             free(stop_vehicle);
             exit(4);
         }
         close(fd[i]);
-        pthread_join(tid[i], NULL);                                                                                     // wait controller end
+#ifdef DEBUG
+        printf("parque: viatura stop %d criada\n", (Acesso) i);
+#endif
     }
     pthread_mutex_unlock(&mutex);                                                                                       // unlock mutex
     free(stop_vehicle);
-    for (j = 0; j < N_ACESSOS; j++) {
-        unlink(fifos[j]);
+    for (i = 0; i < N_ACESSOS; i++) {
+        pthread_join(tid[i], NULL);                                                                                     // wait controller end
+        unlink(fifos[i]);
     }
+    unlink(LOCK_FILE);
+    rmdir(FIFO_DIR);
     pthread_exit(NULL);
 }

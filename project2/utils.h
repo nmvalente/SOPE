@@ -4,13 +4,12 @@
 #define N_ACESSOS       4
 #define SEC2NANO        1000000000
 #define FIFO_DIR        "tmp/"
-#define FIFO_N          "tmp/fifoN"
-#define FIFO_E          "tmp/fifoE"
-#define FIFO_S          "tmp/fifoS"
-#define FIFO_O          "tmp/fifoO"
+#define FIFO_N          "tmp/fifo_N"
+#define FIFO_E          "tmp/fifo_E"
+#define FIFO_S          "tmp/fifo_S"
+#define FIFO_O          "tmp/fifo_O"
 #define FIFO            "tmp/fifo"
 #define FIFO_NAME_SIZE  19
-#define FIFO_MODE       0660
 
 typedef enum {
     N, E, S, O
@@ -42,7 +41,7 @@ typedef struct {
     unsigned tempo;                                                                                                     // parking time for vehicle
     Acesso acesso;                                                                                                      // park access for vehicle
     char fifo[FIFO_NAME_SIZE];                                                                                          // vehicle fifo
-    unsigned n_lugares;                                                                                                 // park total number of spaces
+    int n_lugares;                                                                                                      // park total number of spaces, -1 if park closed
     unsigned *n_ocupados;                                                                                               // park numbr of occupied spaces
     clock_t start_par;                                                                                                  // start time of park
     pthread_mutex_t *mutex;                                                                                             // park mutex
@@ -52,7 +51,6 @@ typedef struct {
     Acesso acesso;                                                                                                      // park access of controller
     unsigned n_lugares;                                                                                                 // total number of parking spaces
     unsigned *n_ocupados;                                                                                               // occupied parking spaces
-    int *retval;                                                                                                        // return value for controller thread
     clock_t start_par;                                                                                                  // start time of park
     pthread_mutex_t *mutex;                                                                                             // park mutex
 } Controlador;
@@ -62,11 +60,11 @@ Viatura *create_viatura(int identificador, unsigned tempo, Acesso acesso, clock_
 
 Viat *create_viat(int identificador, unsigned tempo, Acesso acesso);
 
-Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, unsigned n_lugares,
+Parking_Viat *create_parking_viat(int identificador, unsigned tempo, Acesso acesso, int n_lugares,
                                   unsigned *n_ocupados, clock_t start_par, pthread_mutex_t *mutex);
 
 Controlador *create_controlador(Acesso acesso, unsigned n_lugares, unsigned *n_ocupados,
-                                int *retval, clock_t start_par, pthread_mutex_t *mutex);
+                                clock_t start_par, pthread_mutex_t *mutex);
 
 char* get_acesso(Acesso acesso);
 
