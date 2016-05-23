@@ -182,6 +182,7 @@ int main(int argc, char *argv[]) {
         }
         identificador++;
     }
+    ticksleep(u_relogio, ticks_seg);
     unlink(LOCK_FILE);
     rmdir(FIFO_DIR);
     pthread_exit(NULL);

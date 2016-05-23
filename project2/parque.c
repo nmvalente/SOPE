@@ -66,6 +66,9 @@ void *arrumador_viatura(void *arg) {
         close(fd);
         log_event(viat, evento);
         pthread_mutex_unlock(viat->mutex);                                                                              // unlock mutex
+#ifdef DEBUG
+        printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+#endif
         close_exit_arru(viat, -1, NULL, 0);
         pthread_exit(NULL);
     }
@@ -79,6 +82,9 @@ void *arrumador_viatura(void *arg) {
             close_exit_arru(viat, fd, viat->fifo, 12);
         log_event(viat, evento);
         pthread_mutex_unlock(viat->mutex);
+#ifdef DEBUG
+        printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+#endif
         close_exit_arru(viat, fd, NULL, 0);
     }
     (*viat->n_ocupados)++;
@@ -87,6 +93,9 @@ void *arrumador_viatura(void *arg) {
         close_exit_arru(viat, fd, viat->fifo, 13);
     log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
+#ifdef DEBUG
+    printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+#endif
     ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));                                                                       // waiting for parking session to end
     evento = saida;                                                                                                     // vehicle left park
     pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
@@ -96,6 +105,9 @@ void *arrumador_viatura(void *arg) {
     close(fd);
     log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
+#ifdef DEBUG
+    printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+#endif
     close_exit_arru(viat, -1, NULL, 0);
     pthread_exit(NULL);
 }
@@ -146,7 +158,6 @@ void *tracker_controlador(void *arg) {
     int closed = 0;
     while (closed == 0 && (viat = readViat(fdr)) != NULL) {
 #ifdef DEBUG
-        printf("controlador %d: closed %d ocupados %d\n", controlador->acesso, closed, *controlador->n_ocupados);
         printf("controlador %d: viatura %d recebida\n", controlador->acesso, viat->identificador);
 #endif
         if (viat->identificador == -1) {
