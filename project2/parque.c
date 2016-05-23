@@ -67,7 +67,7 @@ void *arrumador_viatura(void *arg) {
         log_event(viat, evento);
         pthread_mutex_unlock(viat->mutex);                                                                              // unlock mutex
 #ifdef DEBUG
-        printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+        printf("arrumador: lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
 #endif
         close_exit_arru(viat, -1, NULL, 0);
         pthread_exit(NULL);
@@ -83,7 +83,7 @@ void *arrumador_viatura(void *arg) {
         log_event(viat, evento);
         pthread_mutex_unlock(viat->mutex);
 #ifdef DEBUG
-        printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+        printf("arrumador: lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
 #endif
         close_exit_arru(viat, fd, NULL, 0);
     }
@@ -94,7 +94,7 @@ void *arrumador_viatura(void *arg) {
     log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
 #ifdef DEBUG
-    printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+    printf("arrumador: lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
 #endif
     ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));                                                                       // waiting for parking session to end
     evento = saida;                                                                                                     // vehicle left park
@@ -106,7 +106,7 @@ void *arrumador_viatura(void *arg) {
     log_event(viat, evento);
     pthread_mutex_unlock(viat->mutex);                                                                                  // unlock mutex
 #ifdef DEBUG
-    printf("arrumador: n_lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
+    printf("arrumador: lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
 #endif
     close_exit_arru(viat, -1, NULL, 0);
     pthread_exit(NULL);
@@ -120,11 +120,12 @@ void close_exit_cont(Controlador *controlador, Viat *viat, int clos1, int clos2,
     free(viat);
     char *fifos[N_ACESSOS] = {FIFO_N, FIFO_E, FIFO_S, FIFO_O};
     int i;
-    for (i = 0; i < N_ACESSOS; i++) {
-        unlink(fifos[i]);
-    }
-    if (exi > 0)
+    if (exi > 0) {
+        for (i = 0; i < N_ACESSOS; i++) {
+            unlink(fifos[i]);
+        }
         unlink(LOCK_FILE);
+    }
     rmdir(FIFO_DIR);
     if (exi > 0) exit(exi);
 }

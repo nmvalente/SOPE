@@ -4,10 +4,10 @@
 #define N_ACESSOS       4
 #define SEC2NANO        1000000000
 #define FIFO_DIR        "tmp/"
-#define FIFO_N          "tmp/fifo_N"
-#define FIFO_E          "tmp/fifo_E"
-#define FIFO_S          "tmp/fifo_S"
-#define FIFO_O          "tmp/fifo_O"
+#define FIFO_N          "tmp/fifoN"
+#define FIFO_E          "tmp/fifoE"
+#define FIFO_S          "tmp/fifoS"
+#define FIFO_O          "tmp/fifoO"
 #define FIFO            "tmp/fifo"
 #define FIFO_NAME_SIZE  19
 

@@ -1,0 +1,4 @@
+Notas:
+1. makefile cria o diretório bin, por isso não há problema se este não existir;
+2. para ativar output para a consola basta colocar DEBUG = 1, quer em gerador.c, quer em parque.c;
+3. 

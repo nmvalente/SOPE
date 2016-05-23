@@ -95,9 +95,6 @@ void *tracker_viatura(void *arg) {
     }
     close(fd);
     pthread_mutex_unlock(viatura->mutex_fifo);                                                                          // unlock mutex fifo
-#ifdef DEBUG
-    printf("tracker: %s ; %10u ; %10u ; %s\n", get_acesso(viat->acesso), viat->tempo, viat->identificador, viat->fifo);
-#endif
     fd = open(viat->fifo, O_RDONLY);
     if (fd == -1) {
         perror(viat->fifo);
