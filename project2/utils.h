@@ -76,6 +76,8 @@ char* get_fifo(Acesso acesso);
 
 unsigned parse_uint(char *str);
 
-void ticksleep(unsigned ticks, long ticks_seg);
+struct timespec getTimeSpecTicks(unsigned ticks);
+
+void ticksleep(unsigned ticks);
 
 #endif //PROJECT2_UTILS_H

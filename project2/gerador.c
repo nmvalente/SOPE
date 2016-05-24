@@ -13,12 +13,14 @@
 
 #define DEBUG           1
 
+#define TIMEOUT         1
+
 #define N_TEMPOS        10
 #define N_INTERVALOS    10
 #define PROB_INT_0      5
 #define PROB_INT_1      8
 #define LOG_FILE        "gerador.log"
-#define LOCK_FILE        "tmp/gerador"
+#define LOCK_FILE       "tmp/gerador"
 
 unsigned short create_log_file() {
     FILE *log_file;
@@ -57,6 +59,34 @@ void close_exit(Viatura *viatura, Viat *viat, int clos, char *unlin, int exi) {
         unlink(LOCK_FILE);
     rmdir(FIFO_DIR);
     if (exi > 0) exit(exi);
+}
+
+char readEvento(int use_timeout, int fd, Viatura *viatura, Viat *viat, unsigned ticks_timeout) {
+    char evento;
+    if (use_timeout) {
+        fd_set set;
+        FD_ZERO(&set);                                                                                                  // clear the set
+        FD_SET(fd, &set);                                                                                               // add our file descriptor to the set
+        struct timespec timeout = getTimeSpecTicks(ticks_timeout);
+        int result = pselect(fd + 1, &set, NULL, NULL, &timeout, NULL);
+        if (result == -1) {
+            printf("error reading %s\n", viat->fifo);
+            close_exit(viatura, viat, fd, viat->fifo, 11);
+        }
+        else if (result == 0) {                                                                                         // timeout
+#ifdef DEBUG
+            printf("tracker: id %u, t %u, a %u timeout\n", viatura->identificador, viatura->tempo, viatura->acesso);
+#endif
+            return encerrado;
+        }
+        read(fd, &evento, sizeof(char));                                                                                // char read
+        return evento;
+    }
+    if (read(fd, &evento, sizeof(char)) == -1) {
+        printf("error reading %s\n", viat->fifo);
+        close_exit(viatura, viat, fd, viat->fifo, 12);
+    }
+    return evento;
 }
 
 void *tracker_viatura(void *arg) {
@@ -100,14 +130,10 @@ void *tracker_viatura(void *arg) {
         perror(viat->fifo);
         close_exit(viatura, viat, -1, viat->fifo, 8);
     }
-    char evento;
 #ifdef DEBUG
     printf("tracker: id %u waiting read %s\n", viat->identificador, viat->fifo);
 #endif
-    if (read(fd, &evento, sizeof(char)) == -1) {
-        printf("error reading %s\n", viat->fifo);
-        close_exit(viatura, viat, fd, viat->fifo, 9);
-    }
+    char evento = readEvento(TIMEOUT, fd, viatura, viat, TIMEOUT * viat->tempo);
     pthread_mutex_lock(viatura->mutex_log);                                                                             // lock mutex log
     log_event(viatura, (Evento) evento);
     pthread_mutex_unlock(viatura->mutex_log);                                                                           // unlock mutex log
@@ -116,11 +142,11 @@ void *tracker_viatura(void *arg) {
         fd = open(viat->fifo, O_RDONLY);
         if (fd == -1) {
             perror(viat->fifo);
-            close_exit(viatura, viat, -1, viat->fifo, 10);
+            close_exit(viatura, viat, -1, viat->fifo, 9);
         }
         if (read(fd, &evento, sizeof(char)) == -1) {
             printf("error reading %s\n", viat->fifo);
-            close_exit(viatura, viat, fd, viat->fifo, 11);
+            close_exit(viatura, viat, fd, viat->fifo, 10);
         }
         pthread_mutex_lock(viatura->mutex_log);                                                                         // lock mutex log
         log_event(viatura, (Evento) evento);
@@ -166,7 +192,7 @@ int main(int argc, char *argv[]) {
         if (pre_intervalo < PROB_INT_0) intervalo = 0;
         else if (pre_intervalo < PROB_INT_1) intervalo = u_relogio;
         else intervalo = 2 * u_relogio;
-        ticksleep(intervalo, ticks_seg);                                                                                // sleep for random waiting period in clock ticks before generating vehicle
+        ticksleep(intervalo);                                                                                           // sleep for random waiting period in clock ticks before generating vehicle
         Viatura *viatura = create_viatura(identificador, tempo, acesso, times(&now_tms),
                                                  start_time, &mutex_fifo, &mutex_log);                                  // create new vehicle
 #ifdef DEBUG
@@ -179,7 +205,7 @@ int main(int argc, char *argv[]) {
         }
         identificador++;
     }
-    ticksleep(u_relogio, ticks_seg);
+    ticksleep(u_relogio);
     unlink(LOCK_FILE);
     rmdir(FIFO_DIR);
     pthread_exit(NULL);

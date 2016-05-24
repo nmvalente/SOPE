@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include "utils.h"
 
@@ -126,15 +127,18 @@ unsigned parse_uint(char *str) {                                                
     return val;                                                                                                         // successful conversion
 }
 
-void ticksleep(unsigned ticks, long ticks_seg) {                                                                        // sleep for desired number of clock ticks, with number of ticks per second given
-    double seconds = (double)ticks / ticks_seg;
-    struct timespec *req;
-    req = malloc(sizeof(struct timespec));
-    req->tv_sec = (time_t) (seconds);
-    req->tv_nsec = (long) (seconds * SEC2NANO - req->tv_sec * SEC2NANO);
+struct timespec getTimeSpecTicks(unsigned ticks) {
+    struct timespec ts;
+    double seconds = (double)ticks / sysconf(_SC_CLK_TCK);
+    ts.tv_sec = (time_t) (seconds);
+    ts.tv_nsec = (long) (seconds * SEC2NANO - ts.tv_sec * SEC2NANO);
+    return ts;
+}
+
+void ticksleep(unsigned ticks) {                                                                                        // sleep for desired number of clock ticks, with number of ticks per second given
+    struct timespec timesleep = getTimeSpecTicks(ticks);
 #ifdef DEBUG
     printf("sleep: %u ticks, %d sec, %ld nsec\n", ticks, (int)req->tv_sec, req->tv_nsec);
 #endif
-    nanosleep(req, NULL);
-    free(req);
+    nanosleep(&timesleep, NULL);
 }

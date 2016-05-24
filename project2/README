@@ -1,4 +1,7 @@
 Notas:
-1. makefile cria o diretório bin, por isso não há problema se este não existir;
-2. para ativar output para a consola basta colocar DEBUG = 1, quer em gerador.c, quer em parque.c;
-3. 
+
+1. Makefile cria o diretório bin, por isso não há problema se este não existir.
+
+2. Para ativar output para a consola basta remover o comentário de "#define DEBUG = 1", quer em gerador.c, quer em parque.c.
+
+3. Quando o parque encerra, os controladores continuam a atender viaturas até ao momento em que a ultima viatura sai, sendo essas viaturas recusadas pelos seus arrumadores. A partir do momento em que sai a última viatura, os controladores fecham os seus FIFOs, atendendo apenas as viaturas que já lá estejam pendentes. Possíveis viaturas que cheguem após o fecho das FIFOs, ao detectarem que o FIFO que procuram está encerrado, concluem que o parque está encerrado. Isto significa também que caso o gerador seja iniciado antes do parque, as primeiras viaturas ficam todas com resolução "encerrado!".

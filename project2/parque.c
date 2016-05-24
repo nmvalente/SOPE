@@ -15,7 +15,7 @@
 #define DEBUG           1
 
 #define LOG_FILE        "parque.log"
-#define LOCK_FILE        "tmp/parque"
+#define LOCK_FILE       "tmp/parque"
 
 unsigned short create_log_file() {
     FILE *log_file;
@@ -54,7 +54,7 @@ void *arrumador_viatura(void *arg) {
         exit(8);
     }
     Parking_Viat *viat = (Parking_Viat*) arg;
-    if (viat->n_lugares < 0) {                                                                                          // parking lot is closed: this is no longer used!
+    if (viat->n_lugares < 0) {                                                                                          // parking lot is closed
         pthread_mutex_lock(viat->mutex);                                                                                // lock mutex
         int fd = open(viat->fifo, O_WRONLY);
         if (fd == -1)
@@ -96,7 +96,7 @@ void *arrumador_viatura(void *arg) {
 #ifdef DEBUG
     printf("arrumador: lug %u, viat %d, %s\n", *viat->n_ocupados, viat->identificador, get_evento_par(evento));
 #endif
-    ticksleep(viat->tempo, sysconf(_SC_CLK_TCK));                                                                       // waiting for parking session to end
+    ticksleep(viat->tempo);                                                                                             // waiting for parking session to end
     evento = saida;                                                                                                     // vehicle left park
     pthread_mutex_lock(viat->mutex);                                                                                    // lock mutex
     (*viat->n_ocupados)--;
@@ -134,7 +134,7 @@ Viat *readViat(int fd){
     Viat* viat = malloc(sizeof(Viat));
     size_t size = sizeof(Viat);
     size_t read_size = 0;
-    while(read_size != size){
+    while(read_size != size) {
         ssize_t value = read(fd, viat + read_size, size - read_size);
         if( value == -1 || value == 0) {
             free(viat);
@@ -157,17 +157,21 @@ void *tracker_controlador(void *arg) {
         close_exit_cont(controlador, NULL, fdr, -1, fifo, 6);
     Viat *viat;
     int closed = 0;
-    while (closed == 0 && (viat = readViat(fdr)) != NULL) {
+    while ((viat = readViat(fdr)) != NULL || closed == 0 || *controlador->n_ocupados > 0) {
+        if (viat == NULL) continue;
 #ifdef DEBUG
         printf("controlador %d: viatura %d recebida\n", controlador->acesso, viat->identificador);
 #endif
         if (viat->identificador == -1) {
             closed = 1;
+            close(fdr);
+            fdr = open(fifo, O_RDONLY | O_NONBLOCK);
             continue;
         }
         Parking_Viat *pviat = create_parking_viat(viat->identificador, viat->tempo, viat->acesso,
                                                   controlador->n_lugares, controlador->n_ocupados,
                                                   controlador->start_par, controlador->mutex);
+        if (closed) pviat->n_lugares = -1;
         pthread_t thread_controlador;
         if (pthread_create(&thread_controlador, NULL, arrumador_viatura, pviat) != 0) {
             printf("error creating parking assistant thread");
