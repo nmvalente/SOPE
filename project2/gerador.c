@@ -13,7 +13,7 @@
 
 #define DEBUG           1
 
-#define TIMEOUT         1
+#define TIMEOUT         5
 
 #define N_TEMPOS        10
 #define N_INTERVALOS    10

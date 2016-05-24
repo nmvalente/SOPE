@@ -1,7 +1,8 @@
-Notas:
 
-1. Makefile cria o diretório bin, por isso não há problema se este não existir.
-
-2. Para ativar output para a consola basta remover o comentário de "#define DEBUG = 1", quer em gerador.c, quer em parque.c.
+1. Debug para a consola em parque.c e gerador.c podem ser desactivados comentando "#define DEBUG 1".
 
 3. Quando o parque encerra, os controladores continuam a atender viaturas até ao momento em que a ultima viatura sai, sendo essas viaturas recusadas pelos seus arrumadores. A partir do momento em que sai a última viatura, os controladores fecham os seus FIFOs, atendendo apenas as viaturas que já lá estejam pendentes. Possíveis viaturas que cheguem após o fecho das FIFOs, ao detectarem que o FIFO que procuram está encerrado, concluem que o parque está encerrado. Isto significa também que caso o gerador seja iniciado antes do parque, as primeiras viaturas ficam todas com resolução "encerrado!".
+
+4. Para o caso de alguma viatura entrar no FIFO de um carregador e não ser atendida, porque o carregador entretanto encerrou, usamos um timeout na leitura das viaturas no seu FIFO. Assim ao fim desse tempo a viatura assume que o parque está encerrado. Este timeout apenas é usado na primeira leitura, não há timeout na espera pela saída. Para configurar o uso do timeout definir em gerador.c:
+- "#define TIMEOUT 0" - não há timeout, leitura normal;
+- "#define TIMEOUT n" - timeout igual a n * tempo que a viatura vai passar estacionada.
